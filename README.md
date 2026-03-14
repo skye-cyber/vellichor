@@ -256,55 +256,46 @@ graph TB
     subgraph "Mobile Client (React Native)"
         A[UI Layer<br/>React Components] --> B[State Management<br/>Redux/Context]
         B --> C[Core Services Layer]
-        
-        subgraph C [Core Services]
-            C1[Discovery Service]
-            C2[Connection Manager]
-            C3[Streaming Service]
-            C4[Input Handler]
-            C5[File Transfer Service]
-        end
-        
-        subgraph D [Native Modules]
-            D1[Screen Capture<br/>Android: MediaProjection<br/>iOS: ReplayKit]
-            D2[Input Injection<br/>Android: AccessibilityService<br/>iOS: -]
-            D3[File System Access]
-            D4[Network Info]
-        end
-        
-        C --- D
     end
-    
+    subgraph C ["Core Services"]
+        C1[Discovery Service]
+        C2[Connection Manager]
+        C3[Streaming Service]
+        C4[Input Handler]
+        C5[File Transfer Service]
+    end
+    subgraph D ["Native Modules"]
+        D1["Screen Capture<br/>Android: MediaProjection<br/>iOS: ReplayKit"]
+        D2["Input Injection<br/>Android: AccessibilityService<br/>iOS: -"]
+        D3[File System Access]
+        D4[Network Info]
+    end
+    C --- D
     subgraph "Desktop Client (Electron/Node)"
         E[UI Layer<br/>React/Electron] --> F[State Management]
         F --> G[Core Services Layer]
-        
-        subgraph G [Desktop Services]
-            G1[Discovery Service]
-            G2[Connection Manager] 
-            G3[Streaming Service]
-            G4[Input Handler]
-            G5[File Transfer Service]
-        end
-        
-        subgraph H [Native Modules]
-            H1[Screen Capture<br/>Windows: DXGI<br/>Mac: CGDisplayStream]
-            H2[Input Injection<br/>Windows: SendInput<br/>Mac: CGEventCreate]
-            H3[File System Access]
-        end
-        
-        G --- H
     end
-    
+    subgraph G ["Desktop Services"]
+        G1[Discovery Service]
+        G2[Connection Manager]
+        G3[Streaming Service]
+        G4[Input Handler]
+        G5[File Transfer Service]
+    end
+    subgraph H ["Native Modules"]
+        H1["Screen Capture<br/>Windows: DXGI<br/>Mac: CGDisplayStream"]
+        H2["Input Injection<br/>Windows: SendInput<br/>Mac: CGEventCreate"]
+        H3[File System Access]
+    end
+    G --- H
     subgraph "Backend Services"
-        I[Signaling Server<br/>Node.js/Socket.io]
-        J[STUN/TURN Servers<br/>coturn]
-        K[Discovery Service<br/>mDNS/SSDP]
+        I["Signaling Server<br/>Node.js/Socket.io"]
+        J["STUN/TURN Servers<br/>coturn"]
+        K["Discovery Service<br/>mDNS/SSDP"]
     end
-    
-    Mobile Client <--> Backend Services
-    Desktop Client <--> Backend Services
-    Mobile Client <-.-> Desktop Client
+    "Mobile Client (React Native)" <--> "Backend Services"
+    "Desktop Client (Electron/Node)" <--> "Backend Services"
+    "Mobile Client (React Native)" <-.-> "Desktop Client (Electron/Node)"
     
     style A fill:#e1f5fe
     style E fill:#e1f5fe
