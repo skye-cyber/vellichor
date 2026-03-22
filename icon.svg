@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Outline screen share icon">
+    <rect width="256" height="256" rx="28" fill="white"/>
+    <!-- Desktop outline -->
+    <g stroke="#55aaff" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <rect x="28" y="66" width="120" height="72" rx="8"/>
+        <rect x="66" y="146" width="48" height="8" rx="2"/>
+    </g>
+    <!-- Phone outline -->
+    <g stroke="#5555ff" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <rect x="172" y="70" width="48" height="96" rx="10"/>
+        <circle cx="196" cy="124" r="2"/>
+    </g>
+    <!-- Central connection (concentric arcs) -->
+    <g transform="translate(128,146)" fill="none" stroke="#588ffe" stroke-width="5" stroke-linecap="round">
+        <circle r="36"/>
+        <path d="M-24 0 A24 24 0 0 1 -0.5 -23"/>
+        <path d="M24 0 A24 24 0 0 1 0.5 23"/>
+    </g>
+    <!-- Pointer (outline filled) -->
+    <path d="M138 120 L132 100 L129 106 L125 100 L127 107 L138 120 Z" fill="#ff5500"/>
+</svg>

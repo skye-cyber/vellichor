@@ -1,0 +1,618 @@
+Perfect! Let's build Vellichor step-by-step, manually adding content to each part. I'll guide you through each component.
+
+## 📱 Phase 1: Mobile App (React Native)
+
+```bash
+cd vellichor/mobile
+```
+
+### 1.1 Initialize React Native
+```bash
+npx react-native init Vellichor --template react-native-template-typescript
+cd Vellichor
+```
+
+### 1.2 Install Dependencies
+```bash
+npm install \
+  @reduxjs/toolkit \
+  react-redux \
+  react-native-webrtc \
+  react-native-gesture-handler \
+  react-native-reanimated \
+  react-native-safe-area-context \
+  react-native-screens \
+  react-native-vector-icons \
+  react-native-fs \
+  socket.io-client \
+  react-native-device-info
+```
+
+### 1.3 Create App.tsx
+```tsx
+// mobile/Vellichor/src/App.tsx
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { Provider } from 'react-redux';
+import { store } from './store';
+import AppNavigator from './navigation/AppNavigator';
+
+const App = () => {
+  return (
+    <Provider store={store}>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+    </Provider>
+  );
+};
+
+export default App;
+```
+
+### 1.4 Create Store
+```tsx
+// mobile/Vellichor/src/store/index.ts
+import { configureStore } from '@reduxjs/toolkit';
+import connectionReducer from './slices/connectionSlice';
+import deviceReducer from './slices/deviceSlice';
+
+export const store = configureStore({
+  reducer: {
+    connection: connectionReducer,
+    devices: deviceReducer,
+  },
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;
+```
+
+### 1.5 Create Connection Slice
+```tsx
+// mobile/Vellichor/src/store/slices/connectionSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+
+interface ConnectionState {
+  status: 'disconnected' | 'connecting' | 'connected';
+  peerId: string | null;
+  connectionType: 'wifi' | 'p2p' | null;
+}
+
+const initialState: ConnectionState = {
+  status: 'disconnected',
+  peerId: null,
+  connectionType: null,
+};
+
+const connectionSlice = createSlice({
+  name: 'connection',
+  initialState,
+  reducers: {
+    setConnecting: (state) => {
+      state.status = 'connecting';
+    },
+    setConnected: (state, action: PayloadAction<{ peerId: string; type: 'wifi' | 'p2p' }>) => {
+      state.status = 'connected';
+      state.peerId = action.payload.peerId;
+      state.connectionType = action.payload.type;
+    },
+    setDisconnected: (state) => {
+      state.status = 'disconnected';
+      state.peerId = null;
+      state.connectionType = null;
+    },
+  },
+});
+
+export const { setConnecting, setConnected, setDisconnected } = connectionSlice.actions;
+export default connectionSlice.reducer;
+```
+
+### 1.6 Create Device Discovery Hook
+```tsx
+// mobile/Vellichor/src/hooks/useDiscovery.ts
+import { useState, useEffect } from 'react';
+import { Device } from '../types/device.types';
+
+export const useDiscovery = () => {
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const startScanning = () => {
+    setIsScanning(true);
+    // TODO: Implement mDNS/SSDP discovery
+  };
+
+  const stopScanning = () => {
+    setIsScanning(false);
+    // TODO: Stop discovery
+  };
+
+  const connectToDevice = (deviceId: string) => {
+    // TODO: Implement connection logic
+    console.log('Connecting to device:', deviceId);
+  };
+
+  return {
+    devices,
+    isScanning,
+    startScanning,
+    stopScanning,
+    connectToDevice,
+  };
+};
+```
+
+---
+
+## 💻 Phase 2: Desktop App (Electron)
+
+```bash
+cd vellichor/desktop
+```
+
+### 2.1 Initialize Electron
+```bash
+npm init -y
+npm install electron react react-dom @electron-forge/cli
+npx @electron-forge/cli import
+```
+
+### 2.2 Install Dependencies
+```bash
+npm install \
+  socket.io-client \
+  electron-store \
+  robotjs \
+  screenshot-desktop \
+  @types/robotjs \
+  @types/screenshot-desktop
+```
+
+### 2.3 Create Main Process
+```typescript
+// desktop/src/main/index.ts
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
+import Store from 'electron-store';
+import { setupHandlers } from './ipc';
+
+// Initialize store
+Store.initRenderer();
+
+let mainWindow: BrowserWindow | null = null;
+
+const createWindow = () => {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+
+  // Load the app
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
+
+  // Setup IPC handlers
+  setupHandlers(mainWindow);
+};
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+```
+
+### 2.4 Create Preload Script
+```typescript
+// desktop/src/main/preload.ts
+import { contextBridge, ipcRenderer } from 'electron';
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Screen capture
+  captureScreen: () => ipcRenderer.invoke('capture:screen'),
+  
+  // Input control
+  sendMouseEvent: (event: any) => ipcRenderer.send('input:mouse', event),
+  sendKeyboardEvent: (event: any) => ipcRenderer.send('input:keyboard', event),
+  
+  // File transfer
+  selectFile: () => ipcRenderer.invoke('file:select'),
+  saveFile: (data: any) => ipcRenderer.invoke('file:save', data),
+  
+  // Connection
+  connectToDevice: (deviceInfo: any) => ipcRenderer.send('device:connect', deviceInfo),
+  
+  // Listeners
+  onScreenData: (callback: any) => {
+    ipcRenderer.on('screen:frame', (_, data) => callback(data));
+  },
+});
+```
+
+### 2.5 Create IPC Handlers
+```typescript
+// desktop/src/main/ipc/index.ts
+import { BrowserWindow, ipcMain, dialog } from 'electron';
+import * as robot from 'robotjs';
+import screenshot from 'screenshot-desktop';
+import { writeFile } from 'fs/promises';
+
+export const setupHandlers = (mainWindow: BrowserWindow) => {
+  // Screen capture
+  ipcMain.handle('capture:screen', async () => {
+    try {
+      const img = await screenshot({ format: 'png' });
+      return img.toString('base64');
+    } catch (error) {
+      console.error('Screen capture failed:', error);
+      return null;
+    }
+  });
+
+  // Mouse control
+  ipcMain.on('input:mouse', (_, event) => {
+    const { type, x, y, button } = event;
+    
+    switch (type) {
+      case 'move':
+        robot.moveMouse(x, y);
+        break;
+      case 'click':
+        robot.mouseClick(button || 'left');
+        break;
+      case 'drag':
+        robot.dragMouse(x, y);
+        break;
+      case 'scroll':
+        robot.scrollMouse(x, y);
+        break;
+    }
+  });
+
+  // Keyboard control
+  ipcMain.on('input:keyboard', (_, event) => {
+    const { type, key, modifiers } = event;
+    
+    if (type === 'keydown') {
+      robot.keyTap(key, modifiers);
+    }
+  });
+
+  // File selection
+  ipcMain.handle('file:select', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile', 'multiSelections'],
+    });
+    return result.filePaths;
+  });
+
+  // File save
+  ipcMain.handle('file:save', async (_, { name, data }) => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: name,
+    });
+    
+    if (!result.canceled && result.filePath) {
+      const buffer = Buffer.from(data, 'base64');
+      await writeFile(result.filePath, buffer);
+      return true;
+    }
+    return false;
+  });
+};
+```
+
+---
+
+## 🌐 Phase 3: Signaling Server
+
+```bash
+cd vellichor/server
+```
+
+### 3.1 Initialize Server
+```bash
+npm init -y
+npm install express socket.io cors dotenv winston helmet express-rate-limit
+npm install -D typescript @types/express @types/node @types/cors @types/socket.io nodemon ts-node
+```
+
+### 3.2 Create Server Entry
+```typescript
+// server/src/index.ts
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import winston from 'winston';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+dotenv.config();
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:8081'],
+    credentials: true
+  }
+});
+
+// Logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'error.log', level: 'error' })
+  ]
+});
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
+app.use('/api', limiter);
+
+// Room management
+const rooms = new Map();
+
+io.on('connection', (socket) => {
+  logger.info(`Client connected: ${socket.id}`);
+
+  // Create or join room
+  socket.on('join-room', (roomId: string) => {
+    const room = rooms.get(roomId) || new Set();
+    room.add(socket.id);
+    rooms.set(roomId, room);
+    socket.join(roomId);
+    
+    logger.info(`Socket ${socket.id} joined room ${roomId}`);
+    
+    // Notify others in room
+    socket.to(roomId).emit('user-joined', {
+      userId: socket.id,
+      roomId
+    });
+  });
+
+  // WebRTC signaling
+  socket.on('signal', (data: any) => {
+    socket.to(data.roomId).emit('signal', {
+      from: socket.id,
+      signal: data.signal,
+      roomId: data.roomId
+    });
+  });
+
+  // Leave room
+  socket.on('leave-room', (roomId: string) => {
+    const room = rooms.get(roomId);
+    if (room) {
+      room.delete(socket.id);
+      if (room.size === 0) {
+        rooms.delete(roomId);
+      }
+      socket.leave(roomId);
+      
+      socket.to(roomId).emit('user-left', {
+        userId: socket.id,
+        roomId
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+    
+    // Remove from all rooms
+    rooms.forEach((users, roomId) => {
+      if (users.has(socket.id)) {
+        users.delete(socket.id);
+        socket.to(roomId).emit('user-left', {
+          userId: socket.id,
+          roomId
+        });
+      }
+    });
+  });
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    connections: io.engine.clientsCount,
+    rooms: rooms.size
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+
+httpServer.listen(PORT, () => {
+  logger.info(`Vellichor signaling server running on port ${PORT}`);
+});
+```
+
+---
+
+## 📦 Phase 4: Shared Code
+
+```bash
+cd vellichor/shared
+```
+
+### 4.1 Initialize Shared Package
+```bash
+npm init -y
+npm install -D typescript
+```
+
+### 4.2 Create Shared Types
+```typescript
+// shared/src/types/index.ts
+export interface Device {
+  id: string;
+  name: string;
+  type: 'mobile' | 'desktop';
+  platform: 'ios' | 'android' | 'windows' | 'macos' | 'linux';
+  ipAddress?: string;
+  status: 'online' | 'offline' | 'busy';
+}
+
+export interface ConnectionInfo {
+  id: string;
+  peerId: string;
+  connectionType: 'wifi' | 'p2p' | 'relay';
+  status: 'connecting' | 'connected' | 'disconnected';
+  quality: number;
+  latency: number;
+}
+
+export interface StreamConfig {
+  width: number;
+  height: number;
+  fps: number;
+  quality: 'low' | 'medium' | 'high';
+  codec: 'h264' | 'vp8' | 'vp9';
+}
+
+export interface FileTransfer {
+  id: string;
+  name: string;
+  size: number;
+  progress: number;
+  status: 'pending' | 'transferring' | 'completed' | 'failed';
+  direction: 'send' | 'receive';
+  timestamp: number;
+}
+
+// Protocol messages
+export interface SignalingMessage {
+  type: 'offer' | 'answer' | 'candidate' | 'bye';
+  roomId: string;
+  from: string;
+  to?: string;
+  data: any;
+}
+
+export interface ControlMessage {
+  type: 'mouse' | 'keyboard' | 'touch' | 'gesture';
+  action: string;
+  data: any;
+  timestamp: number;
+}
+```
+
+---
+
+## 🚀 Phase 5: Docker Setup (Optional)
+
+```bash
+cd vellichor/server
+```
+
+### 5.1 Create Dockerfile
+```dockerfile
+# server/Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+RUN npm run build
+
+EXPOSE 3000
+
+CMD ["node", "dist/index.js"]
+```
+
+### 5.2 Create docker-compose.yml
+```yaml
+# server/docker-compose.yml
+version: '3.8'
+
+services:
+  signaling-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - CORS_ORIGIN=http://localhost:8081,http://localhost:3000
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+
+  # Optional: Redis for scaling
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+```
+
+---
+
+## 📝 Phase 6: Package Scripts
+
+### Root package.json
+```json
+{
+  "name": "vellichor",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:mobile": "cd mobile/Vellichor && npm run start",
+    "dev:desktop": "cd desktop && npm run start",
+    "dev:server": "cd server && npm run dev",
+    "build:mobile": "cd mobile/Vellichor && npm run build",
+    "build:desktop": "cd desktop && npm run make",
+    "build:server": "cd server && npm run build",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:mobile\" \"npm run dev:desktop\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}
+```
+
+---
+
+## Next Steps
+
+1. **Mobile**: Run `cd mobile/Vellichor && npm run android` or `npm run ios`
+2. **Desktop**: Run `cd desktop && npm run start`
+3. **Server**: Run `cd server && npm run dev`

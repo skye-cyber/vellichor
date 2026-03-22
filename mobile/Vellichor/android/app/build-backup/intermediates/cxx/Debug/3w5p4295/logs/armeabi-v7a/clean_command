@@ -1,0 +1,4 @@
+/home/skye/Android/cmake/3.22.1/bin/ninja \
+  -C \
+  /home/skye/vellichor/mobile/Vellichor/android/app/.cxx/Debug/3w5p4295/armeabi-v7a \
+  clean

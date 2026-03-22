@@ -1,0 +1,7 @@
+ninja: Entering directory `/home/skye/vellichor/mobile/Vellichor/android/app/.cxx/Debug/3w5p4295/armeabi-v7a'
+[0/2] Re-checking globbed directories...
+[1/2] Re-running CMake...
+-- Configuring done
+-- Generating done
+FAILED: build.ninja 
+/home/skye/Android/cmake/3.22.1/bin/cmake --regenerate-during-build -S/home/skye/vellichor/mobile/Vellichor/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup -B/home/skye/vellichor/mobile/Vellichor/android/app/.cxx/Debug/3w5p4295/armeabi-v7a
