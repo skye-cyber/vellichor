@@ -1,0 +1,231 @@
+{
+  "name": "vellichor",
+  "version": "0.1.0",
+  "description": "Connect and control peer devices",
+  "main": "src/main/index.ts",
+  "homepage": "src/renderer/home.html",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:react": "vite",
+    "dev:electron": "electron .",
+    "dev:types": "tsc --noEmit --watch",
+    "dev:styles": "tailwindcss -i ./src/styles/config.css -o ./src/styles/index.css --watch",
+    "dev:renderer": "tsc -p tsconfig.renderer.json --watch",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "build": "npm run clean && npm run type-check && npm run build:all",
+    "build:all": "npm-run-all build:main build:preload build:renderer build:react",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "build:ui": "tsc -p tsconfig.ui.json",
+    "build:react": "vite build",
+    "package": "npm run build && npm run package:electron",
+    "package:electron": "electron-builder",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit",
+    "styles": "tailwindcss -i ./src/styles/config.css -o ./src/styles/index.css",
+    "postinstall": "node src/scripts/post-install.js"
+  },
+  "keywords": [
+    "vellichor"
+  ],
+  "author": {
+    "name": "Wambua Mwikya aka Skye",
+    "email": "swskye17@gmail.com"
+  },
+  "license": "GNU",
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "audit": "^0.0.6",
+    "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "fix": "^0.0.6",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.8",
+    "sharp": "^0.30.7",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "@babel/core": "latest",
+    "@fiahfy/icns": "^0.0.7",
+    "@vitejs/plugin-react": "^5.1.2",
+    "assert": "^2.1.0",
+    "base": "^3.0.0",
+    "bl": "^6.0.16",
+    "braces": "^3.0.3",
+    "browser": "^0.2.6",
+    "browserify-fs": "^1.0.0",
+    "browserify-zlib": "^0.2.0",
+    "child_process": "^1.0.2",
+    "child-process-promise": "latest",
+    "fs": "latest",
+    "https-browserify": "^1.0.0",
+    "lunr": "^2.3.9",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "play-sound": "^1.1.6",
+    "process": "^0.11.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "rollup-plugin-node-polyfills": "^0.2.1",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "url": "^0.11.4",
+    "vite": "^7.1.12",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vm-browserify": "^1.1.2"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "package.json",
+    "build/**/*",
+    "src/renderer/**/*",
+    "src/main/**/*",
+    "public/**/*",
+    "!node_modules/",
+    "!.eproj",
+    "!icons"
+  ],
+  "build": {
+    "appId": "com.vellichor.app",
+    "productName": "vellichor",
+    "electronDownload": {
+      "cache": true
+    },
+    "asar": true,
+    "files": [
+      "**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "src/assets/",
+        "to": "assets/"
+      },
+      {
+        "from": "build/",
+        "to": "build/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "src/common/",
+        "to": "common/"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "src/assets/vellichor.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.dmg"
+    },
+    "win": {
+      "icon": "src/assets/vellichor.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32",
+            "arm64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "license": "LICENSE",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-portable-${version}-${arch}.${ext}"
+    },
+    "msi": {
+      "artifactName": "${productName}-portable-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "armv7l",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "snap",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "src/icons",
+      "maintainer": "Mwikya -- swskye17@gmail.com",
+      "synopsis": "vellichor",
+      "description": "Connect and control peer devices"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.AppImage"
+    },
+    "deb": {
+      "priority": "optional",
+      "artifactName": "${productName}_${version}_${arch}.deb"
+    },
+    "snap": {
+      "summary": "vellichor Snap Package",
+      "grade": "stable",
+      "confinement": "classic",
+      "plugs": [
+        "network",
+        "home",
+        "audio-playback"
+      ],
+      "artifactName": "${productName}_${version}_${arch}.snap"
+    }
+  }
+}

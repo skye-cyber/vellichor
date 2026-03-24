@@ -42,6 +42,8 @@ svgexport icon.svg icons/desktop/icon-64.png 64x64
 svgexport icon.svg icons/desktop/icon-128.png 128x128
 svgexport icon.svg icons/desktop/icon-256.png 256x256
 svgexport icon.svg icons/desktop/icon-512.png 512x512
+svgexport icon.svg icons/desktop/icon-512.png 1024x1024
+cp -r icons/desktop/* desktop/src/icons
 
 # Web/favicon
 svgexport icon.svg icons/web/favicon-16.png 16x16
