@@ -1,5 +1,5 @@
 import RNFS from 'react-native-fs';
-import DocumentPicker from 'react-native-document-picker';
+import * as DocumentPicker from '@react-native-documents/picker';
 import { Platform } from 'react-native';
 import { getConnection, sendData, onData } from './WebRTCService'; // We'll need to implement WebRTC data channel
 
