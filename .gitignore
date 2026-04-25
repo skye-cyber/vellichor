@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 dist/
+build-backup/
 build/
 **/dist/
 **/build/
