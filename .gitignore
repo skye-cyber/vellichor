@@ -11,12 +11,9 @@ build/
 *.js.map
 *.d.ts
 
-# React Native
-mobile/android/app/build/
-mobile/ios/build/
-mobile/ios/Pods/
-mobile/ios/*.xcworkspace/
-mobile/ios/*.xcodeproj/xcuserdata/
+# Tauri
+src-tauri/target/
+# src-tauri/gen/
 
 # Electron
 desktop/out/

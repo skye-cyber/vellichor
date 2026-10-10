@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Dark Mode: Replaces darkMode: 'class' */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Theme: Replaces theme.extend in tailwind.config.js */
+@theme {
+    /* Screens (breakpoints) */
+    --breakpoint-xs: 384px;
+    --breakpoint-sm: 512px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+
+    /* Colors */
+    --color-primary: #6C5CE7;
+    --color-primary-hover: #5B4BC4;
+    --color-primary-light: #A29BFE;
+    --color-primary-dark: #4834D4;
+
+    --color-secondary: #00B894;
+    --color-secondary-hover: #00A381;
+    --color-secondary-light: #55EFC4;
+
+    --color-accent: #FD79A8;
+    --color-accent-hover: #E84393;
+    --color-accent-light: #FFB8D2;
+
+    --color-vellichor-dark: #0F1117;
+    --color-vellichor-surface: #1A1D26;
+    --color-vellichor-card: #222634;
+    --color-vellichor-border: #2E3447;
+
+    /* Box Shadows */
+    --shadow-balanced-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    --shadow-balanced: 0 2px 6px 0 rgba(0, 0, 0, 0.1), 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+    --shadow-balanced-md: 0 4px 12px 0 rgba(0, 0, 0, 0.1), 0 2px 6px 0 rgba(0, 0, 0, 0.08);
+    --shadow-balanced-lg: 0 8px 24px 0 rgba(0, 0, 0, 0.1), 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 0 20px rgba(108, 92, 231, 0.35);
+    --shadow-glow-secondary: 0 0 20px rgba(0, 184, 148, 0.35);
+
+    /* Animations */
+    --animate-pulse-soft: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-float: float 6s ease-in-out infinite;
+    --animate-radar: radar 2s linear infinite;
+
+    /* Keyframes (defined within @theme for custom animations) */
+    @keyframes pulse-soft {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+    }
+    @keyframes radar {
+        0% { transform: scale(0.8); opacity: 0.9; }
+        100% { transform: scale(2.2); opacity: 0; }
+    }
+}
+
+/* --- The rest of your existing CSS --- */
+:root {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color-scheme: light dark;
+}
+
+/* Custom Scrollbars (no change needed) */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.4); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.7); }
+.dark ::-webkit-scrollbar-thumb { background: rgba(75, 85, 99, 0.4); }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(75, 85, 99, 0.7); }
+
+/* Fade In Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

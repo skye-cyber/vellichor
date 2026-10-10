@@ -1,46 +1,53 @@
 {
   "name": "vellichor",
   "version": "0.1.0",
+  "description": "Vellichor is a cross-device control application that allows you to share screens and control devices between your phone and laptop bidirectionally",
   "private": true,
+  "type": "module",
   "workspaces": [
-    "mobile",
-    "desktop",
     "server",
     "shared"
   ],
   "scripts": {
-    "bootstrap": "lerna bootstrap",
-    "clean": "lerna clean",
-    "build": "lerna run build",
-    "dev:mobile": "cd mobile && npm run start",
-    "dev:desktop": "cd desktop && npm run start",
     "dev:server": "cd server && npm run dev",
-    "test": "lerna run test",
-    "lint": "lerna run lint",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
-    "prepare": "husky install"
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:react": "vite --host 0.0.0.0",
+    "dev:styles": "tailwindcss -i ./src/ui/styles/config.css -o ./src/ui/styles/global.css --watch",
+    "dev:types": "tsc --noEmit --watch",
+    "dev:core": "tsc -p tsconfig.core.json --watch",
+    "dev:tauri": "tauri dev",
+    "build": "npm run clean && npm run type-check && npm run build:all",
+    "build:all": "npm-run-all build:core build:react build:tauri",
+    "build:core": "tsc -p tsconfig.core.json",
+    "build:react": "vite build",
+    "build:tauri": "tauri build",
+    "package": "npm run build",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit",
+    "styles": "tailwindcss -i ./src/ui/styles/config.css -o ./src/ui/styles/global.css --minify",
+    "tauri": "tauri",
+    "cert:gen": "keytool -genkey -v -keystore ~/vellichor-upload-keystore.jks -alias vellichor -keyalg RSA -keysize 2048 -validity 10000",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css}\""
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-opener": "^2.2.5",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.8.1",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.0.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-react": "^7.33.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "husky": "^8.0.0",
-    "lerna": "^7.0.0",
-    "lint-staged": "^15.0.0",
-    "prettier": "^3.0.0",
-    "typescript": "^5.0.0"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md}": [
-      "prettier --write"
-    ]
+    "@tauri-apps/cli": "^2.12.1",
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.1.0"
   }
 }

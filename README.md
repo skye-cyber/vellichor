@@ -15,29 +15,31 @@ Vellichor is a cross-device control application that allows you to share screens
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- npm 9+
-- React Native development environment
-- For desktop: Windows SDK or Xcode (depending on platform)
+- Node.js 18+ & npm 9+
+- Rust 1.78+ & Cargo (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- System libraries for Tauri (on Linux: `webkit2gtk-4.1`, `libgtk-3-dev`, `libsoup-3.0`)
 
-### Installation
+### Installation & Running
 
 ```bash
 # Clone and enter project
 git clone https://github.com/yourusername/vellichor.git
 cd vellichor
 
-# Run initialization script
-chmod +x init-vellichor.sh
-./init-vellichor.sh
+# Install frontend dependencies
+npm install
 
-# Install dependencies
-npm run bootstrap
+# Run unified desktop/mobile client with Tauri
+npm run dev
 
-# Start development
-npm run dev:mobile  # For mobile app
-npm run dev:desktop # For desktop app
-npm run dev:server  # For signaling server
+# Or run frontend in fast browser/web dev mode
+npm run dev:vite
+
+# Run signaling server (for WebRTC handshakes and Web Share)
+npm run dev:server
+
+# Build production binary with Tauri (small native binary bundle)
+npm run build
 ```
 
 ## 📁 Project Structure
@@ -249,73 +251,57 @@ vellichor/
 ```
 
 ## Architecture
-### 🏗️ High-Level System Architecture
+### 🏗️ Unified Tauri System Architecture
 
 ```mermaid
 graph TB
-    subgraph Mobile["Mobile Client (React Native)"]
-        A[UI Layer<br/>React Components] --> B[State Management<br/>Redux/Context]
-        B --> C[Core Services Layer]
+    subgraph Client["Unified Client (Tauri 2.0 + React + Tailwind CSS)"]
+        A[UI Layer<br/>React + Tailwind CSS<br/>Adaptive Desktop & Mobile Layouts] --> B[State & Hooks Layer]
+        B --> C[Frontend Services Layer]
         
-        subgraph CoreServices["Core Services"]
-            C1[Discovery Service]
-            C2[Connection Manager]
-            C3[Streaming Service]
-            C4[Input Handler]
-            C5[File Transfer Service]
+        subgraph FrontendServices["Frontend Core Services"]
+            C1[Signaling Client<br/>Socket.io]
+            C2[WebRTC Manager<br/>DataChannels & MediaStream]
+            C3[Streaming Service<br/>Viewer & Broadcaster]
+            C4[Input Handler<br/>Touchpad, Keyboard & Media]
+            C5[File Transfer Service<br/>64KB Chunker & Web Share]
         end
         
-        subgraph NativeModules["Native Modules"]
-            D1[Screen Capture<br/>Android: MediaProjection<br/>iOS: ReplayKit]
-            D2[Input Injection<br/>Android: AccessibilityService<br/>iOS: -]
-            D3[File System Access]
-            D4[Network Info]
+        B --- C1
+        B --- C2
+        B --- C3
+        B --- C4
+        B --- C5
+
+        C --> D[Tauri IPC Bridge<br/>invoke commands]
+        
+        subgraph RustBackend["Native Rust Backend (src-tauri)"]
+            D1[System Info & Local IP Detection]
+            D2[Subnet & mDNS Device Scanning]
+            D3[Native Input Simulation]
+            D4[Local Cache & File Operations]
+            D5[Persistent Configuration Storage]
         end
         
-        C --- D1
-        C --- D2
-        C --- D3
-        C --- D4
+        D --- D1
+        D --- D2
+        D --- D3
+        D --- D4
+        D --- D5
     end
 
-    subgraph Desktop["Desktop Client (Electron/Node)"]
-        E[UI Layer<br/>React/Electron] --> F[State Management]
-        F --> G[Core Services Layer]
-        
-        subgraph DesktopServices["Desktop Services"]
-            G1[Discovery Service]
-            G2[Connection Manager]
-            G3[Streaming Service]
-            G4[Input Handler]
-            G5[File Transfer Service]
-        end
-        
-        subgraph DesktopNative["Native Modules"]
-            H1[Screen Capture<br/>Windows: DXGI<br/>Mac: CGDisplayStream]
-            H2[Input Injection<br/>Windows: SendInput<br/>Mac: CGEventCreate]
-            H3[File System Access]
-        end
-        
-        G --- H1
-        G --- H2
-        G --- H3
-    end
-
-    subgraph Backend["Backend Services"]
+    subgraph Backend["Backend Signaling & Discovery"]
         I[Signaling Server<br/>Node.js/Socket.io]
-        J[STUN/TURN Servers<br/>coturn]
-        K[Discovery Service<br/>mDNS/SSDP]
+        J[STUN Servers<br/>Google STUN]
+        K[Web Share Server<br/>QR Link Endpoint]
     end
 
-    Mobile <--> Backend
-    Desktop <--> Backend
-    Mobile <--> Desktop
+    Client <--> Backend
+    Client <--> Client
 
     style A fill:#e1f5fe
-    style E fill:#e1f5fe
-    style I fill:#fff3e0
-    style J fill:#fff3e0
-    style K fill:#fff3e0
+    style RustBackend fill:#f3e5f5
+    style Backend fill:#fff3e0
 ```
 
 ---

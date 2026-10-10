@@ -2,8 +2,6 @@
   "version": "0.1.0",
   "npmClient": "npm",
   "packages": [
-    "mobile",
-    "desktop",
     "server",
     "shared"
   ]
