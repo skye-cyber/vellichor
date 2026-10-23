@@ -44,6 +44,9 @@ export interface AppSettings {
   maxFrameRate: 30 | 60;
   resolution: '720p' | '1080p' | 'original';
   hardwareAcceleration: boolean;
+
+  // Keyboard & Mobile Input
+  suppressNativeKeyboard: boolean;
 }
 
 export interface ConnectionHistory {
@@ -77,6 +80,8 @@ export interface TransferFile {
   size: number;
   type: string;
   dataUrl?: string;
+  rawFile?: File;
+  localPath?: string;
 }
 
 export interface Transfer {
@@ -84,6 +89,7 @@ export interface Transfer {
   file: TransferFile;
   progress: number;
   speedMb: number;
+  etaSeconds?: number;
   status: 'pending' | 'transferring' | 'completed' | 'failed' | 'paused';
   direction: 'send' | 'receive';
   peerId?: string;
@@ -91,6 +97,7 @@ export interface Transfer {
   chunkSize?: number;
   totalChunks?: number;
   currentChunk?: number;
+  savedPath?: string;
   error?: string;
 }
 
@@ -100,5 +107,6 @@ export interface InputCommand {
   y?: number;
   button?: 'left' | 'right' | 'middle';
   key?: string;
+  code?: string;
   delta_y?: number;
 }

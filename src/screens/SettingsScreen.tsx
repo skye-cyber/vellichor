@@ -15,6 +15,8 @@ import {
     FileText,
     Heart,
     Server,
+    Smartphone,
+    Keyboard,
 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { SectionHeader } from '../components/SectionHeader';
@@ -280,6 +282,19 @@ export const SettingsScreen: React.FC = () => {
                         description="Prevent device display from sleeping while a remote session is active"
                         value={settings.keepAwake}
                         onValueChange={(val) => updateSetting('keepAwake', val)}
+                    />
+                </div>
+            </section>
+
+            {/* 5. Keyboard & Mobile Input Section */}
+            <section className="space-y-2">
+                <SectionHeader title="Keyboard & Mobile Input" icon={Keyboard} />
+                <div className="rounded-3xl bg-white dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border shadow-sm divide-y divide-gray-100 dark:divide-vellichor-border/50">
+                    <ToggleSetting
+                        label="Suppress Default Android/Mobile Keyboard"
+                        description="Prevents the native system soft keyboard from popping up automatically when editable remote control fields are clicked, keeping the screen unobstructed"
+                        value={settings.suppressNativeKeyboard}
+                        onValueChange={(val) => updateSetting('suppressNativeKeyboard', val)}
                     />
                 </div>
             </section>

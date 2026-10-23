@@ -10,7 +10,7 @@ import {
     Unplug,
 } from 'lucide-react';
 import { Device, SystemInfo } from '../types';
-import appIcon from '../../assets/vellichor.png';
+import appIcon from '../../assets/vellichor_transparent.png';
 
 interface NavbarProps {
     currentTab: string;

@@ -65,7 +65,7 @@ export const App: React.FC = () => {
     }, []);
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-gray-50 dark:bg-vellichor-dark text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors py-8">
+        <div className="h-screen w-screen flex flex-col bg-gray-50 dark:bg-vellichor-dark text-gray-900 dark:text-gray-100 overflow-hidden font-sans transition-colors py-8 sm:py-0">
             {/* Top Application Bar */}
             <Navbar
                 currentTab={currentTab}

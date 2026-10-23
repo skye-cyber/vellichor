@@ -1,225 +1,326 @@
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::net::UdpSocket;
-use tauri::Manager;
+// Vellichor native backend module declarations
+pub mod cache;
+pub mod discovery;
+pub mod files;
+pub mod input;
+pub mod settings;
+pub mod system;
+pub mod types;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SystemInfo {
-    pub hostname: String,
-    pub platform: String,
-    pub arch: String,
-    pub device_type: String,
-    pub local_ips: Vec<String>,
+// Re-exports for clean library access
+pub use cache::*;
+pub use discovery::*;
+pub use files::*;
+pub use input::*;
+pub use settings::*;
+pub use system::*;
+pub use types::*;
+
+// App imports
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+// Cross-platform imports — used on desktop, Android, and iOS
+use tauri::{AppHandle, Manager, Runtime, WindowEvent};
+
+// Desktop-only imports — tray, menu, and global shortcuts
+#[cfg(desktop)]
+use tauri::{
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+};
+
+#[cfg(desktop)]
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+/// Cross-platform: the frontend may query it even on mobile.
+struct AppState {
+    is_quitting: AtomicBool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DiscoveredDevice {
-    pub id: String,
-    pub name: String,
-    pub device_type: String,
-    pub platform: String,
-    pub status: String,
-    pub ip: String,
-    pub signal_strength: u8,
-    pub last_seen: String,
+/// Desktop-only in practice (tray/window icons), but the struct itself
+/// is cheap to keep on all platforms so `manage()` doesn't need a guard.
+struct IconState {
+    #[allow(dead_code)]
+    path: std::sync::Mutex<PathBuf>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CacheInfo {
-    pub size_bytes: u64,
-    pub files_count: usize,
-    pub last_cleared: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct InputCommand {
-    pub action: String, // "mousemove", "mousedown", "mouseup", "click", "keypress", "scroll"
-    pub x: Option<f64>,
-    pub y: Option<f64>,
-    pub button: Option<String>,
-    pub key: Option<String>,
-    pub delta_y: Option<f64>,
-}
-
-fn get_local_ip_internal() -> Option<String> {
-    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("8.8.8.8:80").ok()?;
-    socket.local_addr().ok().map(|addr| addr.ip().to_string())
-}
-
+/// Replaces `ipcMain.handle('get-app-version', ...)`
 #[tauri::command]
-fn get_system_info() -> SystemInfo {
-    let platform = std::env::consts::OS.to_string();
-    let arch = std::env::consts::ARCH.to_string();
-
-    let hostname = std::env::var("HOSTNAME")
-        .or_else(|_| std::env::var("USER"))
-        .unwrap_or_else(|_| "Vellichor-Device".to_string());
-
-    let mut local_ips = Vec::new();
-    if let Some(ip) = get_local_ip_internal() {
-        local_ips.push(ip);
-    }
-    if local_ips.is_empty() {
-        local_ips.push("127.0.0.1".to_string());
-    }
-
-    let device_type = match platform.as_str() {
-        "android" | "ios" => "phone",
-        _ => "laptop",
-    }
-    .to_string();
-
-    SystemInfo {
-        hostname,
-        platform,
-        arch,
-        device_type,
-        local_ips,
-    }
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Replaces `ipcMain.handle('get-dev-status', ...)`
 #[tauri::command]
-async fn scan_network() -> Result<Vec<DiscoveredDevice>, String> {
-    let my_ip = get_local_ip_internal().unwrap_or_else(|| "192.168.1.100".to_string());
-    let parts: Vec<&str> = my_ip.split('.').collect();
+fn get_dev_status() -> bool {
+    cfg!(debug_assertions)
+}
 
-    let base_prefix = if parts.len() == 4 {
-        format!("{}.{}.{}", parts[0], parts[1], parts[2])
+/*
+ * Resolves the on-disk path to the current app icon. Cross-platform because it only touches the filesystem — no tray/window APIs.
+ */
+fn resolve_icon_path<R: Runtime>(app: &AppHandle<R>, _dark: bool) -> PathBuf {
+    let filename = "vellichor.png";
+
+    if cfg!(debug_assertions) {
+        std::env::current_dir()
+        .unwrap_or_default()
+        .join("../assets")
+        .join(filename)
     } else {
-        "192.168.1".to_string()
-    };
-
-    let devices = vec![
-        DiscoveredDevice {
-            id: "peer-1".to_string(),
-            name: "Workstation (Linux)".to_string(),
-            device_type: "laptop".to_string(),
-            platform: "linux".to_string(),
-            status: "online".to_string(),
-            ip: format!("{}.105", base_prefix),
-            signal_strength: 95,
-            last_seen: "just now".to_string(),
-        },
-        DiscoveredDevice {
-            id: "peer-2".to_string(),
-            name: "Galaxy Phone".to_string(),
-            device_type: "phone".to_string(),
-            platform: "android".to_string(),
-            status: "online".to_string(),
-            ip: format!("{}.120", base_prefix),
-            signal_strength: 84,
-            last_seen: "1 min ago".to_string(),
-        },
-        DiscoveredDevice {
-            id: "peer-3".to_string(),
-            name: "MacBook Air".to_string(),
-            device_type: "laptop".to_string(),
-            platform: "macos".to_string(),
-            status: "busy".to_string(),
-            ip: format!("{}.142", base_prefix),
-            signal_strength: 68,
-            last_seen: "4 mins ago".to_string(),
-        },
-    ];
-
-    Ok(devices)
+        app.path()
+        .resource_dir()
+        .unwrap_or_default()
+        .join("assets")
+        .join(filename)
+    }
 }
 
-#[tauri::command]
-fn get_cache_size(app_handle: tauri::AppHandle) -> Result<CacheInfo, String> {
-    let cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
+/*
+ * Desktop-only: `TrayIconBuilder`, `Menu`, `MenuItem`, `TrayIconEvent` are all gated behind `#[cfg(all(desktop, feature = "tray-icon"))]`.
+ */
+#[cfg(desktop)]
+fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let mut size = 0u64;
-    let mut count = 0usize;
+    let menu = Menu::with_items(app, &[&show_i, &sep, &quit_i])?;
 
-    if cache_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&cache_dir) {
-            for entry in entries.flatten() {
-                if let Ok(metadata) = entry.metadata() {
-                    size += metadata.len();
-                    count += 1;
+    let icon = tauri::image::Image::from_path(resolve_icon_path(app, false))?;
+
+    let _tray = TrayIconBuilder::with_id("main-tray")
+    .icon(icon)
+    .tooltip("OpenReel")
+    .menu(&menu)
+    .show_menu_on_left_click(false)
+    .on_menu_event(|app, event| match event.id.as_ref() {
+        "show" => {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+        "quit" => {
+            app.state::<AppState>()
+            .is_quitting
+            .store(true, Ordering::SeqCst);
+            app.exit(0);
+        }
+        _ => {}
+    })
+    .on_tray_icon_event(|tray, event| {
+        // Double-click → show main window (Electron's `tray.on('double-click')`)
+        if let TrayIconEvent::DoubleClick {
+            button: MouseButton::Left,
+            ..
+        } = event
+        {
+            let app = tray.app_handle();
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+        // Also handle single left-click show (common UX).
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } = event
+        {
+            let app = tray.app_handle();
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+            }
+        }
+    })
+    .build(app)?;
+
+    Ok(())
+}
+
+/*
+ * Desktop-only: `tauri_plugin_global_shortcut` is compiled only on non-mobile targets (see `Cargo.toml`'s target-specific dependency block).
+ */
+#[cfg(desktop)]
+fn register_shortcuts<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
+    // F12 — toggle devtools
+    let f12 = Shortcut::new(None, Code::F12);
+    app.global_shortcut().on_shortcut(f12, |app, _sc, ev| {
+        #[cfg(debug_assertions)]
+        if ev.state == ShortcutState::Pressed {
+            if let Some(win) = app.get_webview_window("main") {
+                {
+                    if win.is_devtools_open() {
+                        win.close_devtools();
+                    } else {
+                        win.open_devtools();
+                    }
                 }
             }
         }
-    } else {
-        let _ = fs::create_dir_all(&cache_dir);
-    }
+    })?;
 
-    Ok(CacheInfo {
-        size_bytes: size,
-        files_count: count,
-        last_cleared: "Never".to_string(),
-    })
-}
+    // Reload — Cmd+R on macOS, Ctrl+R on Windows/Linux
+    #[cfg(target_os = "macos")]
+    let reload = Shortcut::new(Some(Modifiers::META), Code::KeyR);
+    #[cfg(not(target_os = "macos"))]
+    let reload = Shortcut::new(Some(Modifiers::CONTROL), Code::KeyR);
 
-#[tauri::command]
-fn clear_cache(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
-
-    if cache_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&cache_dir) {
-            for entry in entries.flatten() {
-                let _ = fs::remove_file(entry.path());
+    app.global_shortcut().on_shortcut(reload, |app, _sc, ev| {
+        if ev.state == ShortcutState::Pressed {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.eval("window.location.reload()");
             }
         }
-    }
-    Ok(true)
+    })?;
+
+    // Force reload — Cmd+Shift+R on macOS, Ctrl+Shift+R on Windows/Linux
+    #[cfg(target_os = "macos")]
+    let force_reload = Shortcut::new(Some(Modifiers::META | Modifiers::SHIFT), Code::KeyR);
+    #[cfg(not(target_os = "macos"))]
+    let force_reload = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyR);
+
+    app.global_shortcut()
+    .on_shortcut(force_reload, |app, _sc, ev| {
+        if ev.state == ShortcutState::Pressed {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.eval("window.location.reload()");
+            }
+        }
+    })?;
+
+    // F11 — toggle fullscreen
+    let f11 = Shortcut::new(None, Code::F11);
+    app.global_shortcut().on_shortcut(f11, |app, _sc, ev| {
+        if ev.state == ShortcutState::Pressed {
+            if let Some(win) = app.get_webview_window("main") {
+                if let Ok(is_fs) = win.is_fullscreen() {
+                    let _ = win.set_fullscreen(!is_fs);
+                }
+            }
+        }
+    })?;
+
+    Ok(())
 }
 
-#[tauri::command]
-fn simulate_input(cmd: InputCommand) -> Result<String, String> {
-    log::info!("Simulating input command: {:?}", cmd);
-    Ok(format!("Simulated action: {}", cmd.action))
+/*
+ * This function only handles the "show after load" logic and the close-to-tray interception.
+ *
+ * Desktop-only: the close-to-tray interception relies on the tray existing;
+ * on mobile, closing the window should just close it.
+ */
+#[cfg(desktop)]
+fn wire_main_window<R: Runtime>(app: &AppHandle<R>) {
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+
+    // Close main window → hide to tray unless `is_quitting` is set.
+    let main_clone = main.clone();
+    main.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            let state = main_clone.app_handle().state::<AppState>();
+            if !state.is_quitting.load(Ordering::SeqCst) {
+                api.prevent_close();
+                let _ = main_clone.hide();
+            }
+        }
+    });
 }
 
-#[tauri::command]
-fn get_stored_settings(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let config_dir = app_handle
-        .path()
-        .app_config_dir()
-        .map_err(|e| e.to_string())?;
-    let settings_file = config_dir.join("settings.json");
-
-    if settings_file.exists() {
-        fs::read_to_string(settings_file).map_err(|e| e.to_string())
-    } else {
-        Ok("{}".to_string())
-    }
+/*
+ * Builds the Tauri app with plugins appropriate for the current platform.
+ * The `#[cfg(desktop)]` shadowing pattern is intentional: on mobile,
+ * the second `let builder = ...` line is simply not compiled,
+ * so the original `builder` value flows through unchanged.
+ */
+fn build_app() -> tauri::Builder<tauri::Wry> {
+    let builder = tauri::Builder::default()
+    // Core application logging plugin
+    // .plugin(tauri_plugin_log::Builder::default().build())
+    // MUST be first. Before other plugins, before .manage().
+    .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+    .plugin(
+        tauri_plugin_log::Builder::new()
+        .level(log::LevelFilter::Info)
+        .targets([
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                file_name: Some("openreel".into()),
+            }),
+            // tauri_plugin_log::Target::new(
+            //     tauri_plugin_log::TargetKind::Folder {
+            //         path: make_log_dir(),
+            //         file_name: Some("openreel".into()),
+            //     },
+            // ),
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                 tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Webview),
+        ])
+        .max_file_size(5 * 1024 * 1024)  // 5 MB per file
+        .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
+        .build(),
+    );
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    builder
 }
 
-#[tauri::command]
-fn save_stored_settings(app_handle: tauri::AppHandle, settings_json: String) -> Result<bool, String> {
-    let config_dir = app_handle
-        .path()
-        .app_config_dir()
-        .map_err(|e| e.to_string())?;
-    let _ = fs::create_dir_all(&config_dir);
-    let settings_file = config_dir.join("settings.json");
-
-    fs::write(settings_file, settings_json).map_err(|e| e.to_string())?;
-    Ok(true)
-}
-
+// Main entry point for desktop and mobile application runtime
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::default().build())
+    build_app()
+        .manage(AppState {
+            is_quitting: AtomicBool::new(false),
+        })
+        .manage(IconState {
+            path: std::sync::Mutex::new(PathBuf::new()),
+        })
+        // Tauri IPC command handlers registration
         .invoke_handler(tauri::generate_handler![
-            get_system_info,
-            scan_network,
-            get_cache_size,
-            clear_cache,
-            simulate_input,
-            get_stored_settings,
-            save_stored_settings
+            get_dev_status,
+            get_app_version,
+            // System and hardware telemetry commands
+            system::get_system_info,
+            // LAN and UDP peer network discovery commands
+            discovery::scan_network,
+            // Storage cache interrogation and clearance commands
+            cache::get_cache_size,
+            cache::clear_cache,
+            // Input synthesis and desktop automation commands
+            input::simulate_input,
+            // Persistent settings storage commands
+            settings::get_stored_settings,
+            settings::save_stored_settings,
+            // Native file transfer and chunked filesystem commands
+            files::get_download_directory,
+            files::write_file_chunk,
+            files::read_file_chunk,
+            files::get_file_info
         ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+
+            /* Desktop-only setup. Everything below touches APIs that are
+             * `#[cfg(desktop)]`-gated inside Tauri itself (tray, window icons, global shortcuts, menu).
+             **/
+            #[cfg(desktop)]
+            {
+                // Register global shortcuts (was `setShortcuts()`).
+                if let Err(e) = register_shortcuts(&handle) {
+                    eprintln!("shortcut registration failed: {e}");
+                }
+
+                // Build tray.
+                build_tray(&handle)?;
+
+                // Wire main-window close → hide-to-tray.
+                wire_main_window(&handle);
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
-        .expect("error while building tauri application");
+        .expect("error while running vellichor application");
 }

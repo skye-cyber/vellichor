@@ -19,7 +19,7 @@ export const WebShareModal: React.FC<WebShareModalProps> = ({
   const shareUrl = `${serverUrl}/share/${file.id}`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
+    navigator.clipboard?.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

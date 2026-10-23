@@ -26,6 +26,7 @@ class SettingsServiceClass {
         maxFrameRate: 60,
         resolution: '1080p',
         hardwareAcceleration: true,
+        suppressNativeKeyboard: false,
     };
 
     private constructor() { }

@@ -7,6 +7,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Device } from '../types';
+import { useSettings } from '../hooks/useSettings';
 import { Touchpad } from '../components/Touchpad';
 import { VirtualKeyboard } from '../components/VirtualKeyboard';
 import { MediaController } from '../components/MediaController';
@@ -20,6 +21,7 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
   connectedDevice,
   onNavigateToDiscovery,
 }) => {
+  const { settings } = useSettings();
   const [controlMode, setControlMode] = useState<'touchpad' | 'keyboard' | 'media'>('touchpad');
 
   return (
@@ -105,7 +107,9 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
       {/* Control Area */}
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         {controlMode === 'touchpad' && <Touchpad deviceName={connectedDevice?.name} />}
-        {controlMode === 'keyboard' && <VirtualKeyboard />}
+        {controlMode === 'keyboard' && (
+          <VirtualKeyboard initialSuppressNative={settings.suppressNativeKeyboard} />
+        )}
         {controlMode === 'media' && <MediaController />}
       </div>
     </div>

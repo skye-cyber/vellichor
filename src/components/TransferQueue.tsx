@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   File,
+  FolderOpen,
+  Clock,
 } from 'lucide-react';
 import { Transfer } from '../types';
 import { FileTransferService } from '../services/FileTransferService';
@@ -25,6 +27,13 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  const formatEta = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s left`;
+  };
+
   if (transfers.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-400 space-y-3">
@@ -35,7 +44,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
           No Active Transfers
         </h4>
         <p className="text-xs text-gray-500 max-w-xs">
-          Files sent to or received from connected peers will appear here with live speed and chunk tracking.
+          Files sent to or received from connected peers stream in 64KB blocks with real-time throughput metrics.
         </p>
       </div>
     );
@@ -48,6 +57,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
         const isCompleted = item.status === 'completed';
         const isFailed = item.status === 'failed';
         const isPaused = item.status === 'paused';
+        const etaText = formatEta(item.etaSeconds);
 
         return (
           <div
@@ -92,7 +102,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                 {isCompleted ? (
                   <span className="flex items-center space-x-1 text-xs font-semibold text-secondary px-2.5 py-1 rounded-full bg-secondary/10">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Done</span>
+                    <span>Complete</span>
                   </span>
                 ) : isFailed ? (
                   <span className="flex items-center space-x-1 text-xs font-semibold text-red-500 px-2.5 py-1 rounded-full bg-red-500/10">
@@ -101,18 +111,26 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                   </span>
                 ) : (
                   <>
-                    <span className="text-xs font-mono font-bold text-primary">
-                      {item.speedMb} MB/s
-                    </span>
+                    <div className="text-right">
+                      <div className="text-xs font-mono font-bold text-primary">
+                        {item.speedMb} MB/s
+                      </div>
+                      {etaText && (
+                        <div className="text-[10px] text-gray-400 font-mono flex items-center justify-end space-x-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{etaText}</span>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => FileTransferService.togglePause(item.id)}
-                      className="p-1.5 rounded-xl bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-300 hover:text-primary transition-colors"
+                      className="p-1.5 rounded-xl bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-300 hover:text-primary transition-colors cursor-pointer"
                     >
                       {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
                     </button>
                     <button
                       onClick={() => FileTransferService.cancelTransfer(item.id)}
-                      className="p-1.5 rounded-xl bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-300 hover:text-red-500 transition-colors"
+                      className="p-1.5 rounded-xl bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-300 hover:text-red-500 transition-colors cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -120,6 +138,14 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                 )}
               </div>
             </div>
+
+            {/* Saved File Location Banner */}
+            {isCompleted && item.savedPath && (
+              <div className="p-2 rounded-xl bg-gray-50 dark:bg-vellichor-surface text-[11px] text-gray-600 dark:text-gray-400 flex items-center space-x-2 font-mono truncate">
+                <FolderOpen className="w-3.5 h-3.5 text-secondary shrink-0" />
+                <span className="truncate">Saved to: {item.savedPath}</span>
+              </div>
+            )}
 
             {/* Progress Bar */}
             <div className="space-y-1">
@@ -137,7 +163,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
               </div>
               <div className="flex justify-between text-[10px] text-gray-400 font-mono">
                 <span>
-                  {item.currentChunk || 0} / {item.totalChunks || 1} chunks (64KB)
+                  {item.currentChunk || 0} / {item.totalChunks || 1} chunks (64KB blocks)
                 </span>
                 <span>{item.progress}%</span>
               </div>

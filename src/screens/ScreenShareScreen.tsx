@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MonitorPlay,
   MonitorUp,
   Tv,
   CheckCircle2,
   AlertCircle,
+  Radio,
 } from 'lucide-react';
 import { Device } from '../types';
 import { ScreenViewer } from '../components/ScreenViewer';
 import { ScreenBroadcaster } from '../components/ScreenBroadcaster';
+import { WebRTCService, PartnerState } from '../services/WebRTCService';
 
 interface ScreenShareScreenProps {
   connectedDevice: Device | null;
@@ -20,6 +22,20 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
   onNavigateToDiscovery,
 }) => {
   const [activeTab, setActiveTab] = useState<'watch' | 'broadcast'>('watch');
+  const [partnerState, setPartnerState] = useState<PartnerState>({ isBroadcasting: false });
+
+  // Listen to live partner state changes and automatically switch to watch mode when partner streams
+  useEffect(() => {
+    const unsub = WebRTCService.onPartnerStateChange((state) => {
+      setPartnerState(state);
+      if (state.isBroadcasting) {
+        // Enforce tight-loop pairing: auto-switch to watch mode when partner broadcasts
+        setActiveTab('watch');
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col p-4 md:p-8 space-y-4 max-w-6xl mx-auto w-full h-full overflow-hidden">
@@ -32,8 +48,9 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
               <span>Screen Sharing</span>
             </h2>
             {connectedDevice ? (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-secondary/10 text-secondary border border-secondary/20">
-                Connected to {connectedDevice.name}
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-secondary/10 text-secondary border border-secondary/20 flex items-center space-x-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                <span>Connected to {connectedDevice.name}</span>
               </span>
             ) : (
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
@@ -58,12 +75,23 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
           >
             <Tv className="w-4 h-4" />
             <span>Watch Remote</span>
+            {partnerState.isBroadcasting && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            )}
           </button>
           <button
             onClick={() => setActiveTab('broadcast')}
+            disabled={partnerState.isBroadcasting}
+            title={
+              partnerState.isBroadcasting
+                ? 'Partner is broadcasting. Only one device can broadcast at a time.'
+                : undefined
+            }
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
               activeTab === 'broadcast'
                 ? 'bg-primary text-white shadow-sm'
+                : partnerState.isBroadcasting
+                ? 'opacity-40 cursor-not-allowed text-gray-400'
                 : 'text-gray-600 dark:text-gray-300 hover:text-primary'
             }`}
           >
@@ -72,6 +100,15 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
           </button>
         </div>
       </div>
+
+      {partnerState.isBroadcasting && activeTab === 'watch' && (
+        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-center space-x-2 shrink-0">
+          <Radio className="w-4 h-4 animate-pulse shrink-0" />
+          <span>
+            {connectedDevice ? connectedDevice.name : 'Partner'} is currently streaming their screen live.
+          </span>
+        </div>
+      )}
 
       {!connectedDevice && (
         <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-600 dark:text-amber-400 shrink-0">
@@ -95,7 +132,10 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
         {activeTab === 'watch' ? (
           <ScreenViewer device={connectedDevice} />
         ) : (
-          <ScreenBroadcaster activePeerName={connectedDevice?.name} />
+          <ScreenBroadcaster
+            activePeerName={connectedDevice?.name}
+            partnerBroadcasting={partnerState.isBroadcasting}
+          />
         )}
       </div>
     </div>
