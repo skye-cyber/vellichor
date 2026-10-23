@@ -18,8 +18,10 @@ interface ScreenViewerProps {
 
 export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [hasDirectFrame, setHasDirectFrame] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [quality, setQuality] = useState<'720p' | '1080p' | 'auto'>('1080p');
   const [forwardInput, setForwardInput] = useState(true);
@@ -31,6 +33,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
   });
 
   useEffect(() => {
+    // WebRTC stream subscriber (for Android WebView & modern browser peers)
     const unsubStream = WebRTCService.onRemoteStream((stream) => {
       setRemoteStream(stream);
       if (videoRef.current && stream) {
@@ -38,6 +41,22 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
         videoRef.current.play().catch((err) => {
           console.warn('Video play error (handled):', err);
         });
+      }
+    });
+
+    // Direct transport frame subscriber (for WebKitGTK on Linux without WebRTC)
+    const unsubFrame = WebRTCService.onFrame((frameDataUrl) => {
+      setHasDirectFrame(true);
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+        };
+        img.src = frameDataUrl;
       }
     });
 
@@ -52,6 +71,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
 
     return () => {
       unsubStream();
+      unsubFrame();
       unsubStats();
     };
   }, []);
@@ -177,7 +197,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
           <button
             onClick={togglePiP}
             title="Picture-in-Picture"
-            className="p-2 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white hover:text-primary transition-colors"
+            className="p-2 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white hover:text-primary transition-colors cursor-pointer"
           >
             <PictureInPicture className="w-3.5 h-3.5" />
           </button>
@@ -186,7 +206,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
           <button
             onClick={() => setForwardInput(!forwardInput)}
             title={forwardInput ? 'Remote input forwarded' : 'Remote input disabled'}
-            className={`p-2 rounded-xl backdrop-blur-md border text-[9px] font-semibold flex items-center space-x-1.5 transition-colors ${
+            className={`p-2 rounded-xl backdrop-blur-md border text-[9px] font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
               forwardInput
                 ? 'bg-primary border-primary text-white'
                 : 'bg-black/70 border-white/10 text-white/60 hover:text-white'
@@ -198,7 +218,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
           {/* Fullscreen toggle */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white hover:text-primary transition-colors"
+            className="p-2 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 text-white hover:text-primary transition-colors cursor-pointer"
           >
             {isFullscreen ? (
               <Minimize2 className="w-3.5 h-3.5" />
@@ -209,13 +229,18 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
         </div>
       </div>
 
-      {/* Video Content or Standby Canvas */}
+      {/* Video Content, Hardware Canvas, or Standby HUD */}
       {remoteStream ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
+          className="w-full h-full object-contain pointer-events-none select-none bg-black"
+        />
+      ) : hasDirectFrame ? (
+        <canvas
+          ref={canvasRef}
           className="w-full h-full object-contain pointer-events-none select-none bg-black"
         />
       ) : (
@@ -233,7 +258,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
           </div>
           <div className="flex items-center space-x-2 text-xs text-gray-400 font-mono">
             <Layers className="w-3.5 h-3.5 text-primary" />
-            <span>Hardware Accelerated WebRTC Decoder Active</span>
+            <span>Dual-Mode Hardware Video Engine Active</span>
           </div>
         </div>
       )}
