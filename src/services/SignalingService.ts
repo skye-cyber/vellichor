@@ -313,6 +313,14 @@ class SignalingServiceClass {
   public handleIncomingSignal(payload: { from: string; fromDeviceId?: string; signal: any }) {
     if (!payload || !payload.signal) return;
 
+    // Ignore signals originating from this device
+    if (this.myPresence) {
+      const myId = this.myPresence.deviceId;
+      if (payload.fromDeviceId && payload.fromDeviceId === myId) return;
+      if (payload.from && payload.from === myId) return;
+      if (payload.signal?.fromDevice?.id && payload.signal.fromDevice.id === myId) return;
+    }
+
     // Deduplicate duplicate signals arriving from both WebSocket, native IPC, and HTTP poll
     const sigType = payload.signal.type || '';
     const pin = payload.signal.pin || '';
