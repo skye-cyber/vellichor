@@ -90,7 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onClick={() => setIsMobileLayout(!isMobileLayout)}
                     title={isMobileLayout ? 'Switch to Desktop Layout' : 'Preview Mobile Layout'}
                     className={`p-2 rounded-lg border transition-colors ${isMobileLayout
-                        ? 'hidden bg-primary/10 border-primary text-primary'
+                        ? 'hidden sm:block bg-primary/10 border-primary text-primary'
                         : 'bg-gray-100 dark:bg-vellichor-card border-gray-200 dark:border-vellichor-border text-gray-600 dark:text-gray-300 hover:border-primary/50'
                         }`}
                 >
