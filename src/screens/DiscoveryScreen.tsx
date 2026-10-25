@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Device } from '../types';
 import { DeviceCard } from '../components/DeviceCard';
-import { PairingModal } from '../components/PairingModal';
 import { ManualConnectModal } from '../components/ManualConnectModal';
 
 interface DiscoveryScreenProps {
@@ -33,7 +32,6 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
-  const [pairingTarget, setPairingTarget] = useState<Device | null>(null);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
   const filteredDevices = devices.filter((d) => {
@@ -46,7 +44,7 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({
   });
 
   const handleDeviceConnectClick = (device: Device) => {
-    setPairingTarget(device);
+    onConnectDevice(device);
   };
 
   const handleQuickAction = (
@@ -65,10 +63,10 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({
     <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 max-w-6xl mx-auto w-full">
       {/* Top Banner & Scan Header */}
       <div className="p-6 rounded-3xl bg-white dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <div className="relative">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-              <Radio className={`w-7 h-7 ${isScanning ? 'animate-pulse' : ''}`} />
+            <div className="size-8 sm:size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <Radio className={`w-4 h-4 sm:w-7 sm:h-7 ${isScanning ? 'animate-pulse' : ''}`} />
             </div>
             {isScanning && (
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-secondary animate-ping" />
@@ -77,10 +75,10 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({
 
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h2 className="text-md sm:text-xl font-bold text-gray-900 dark:text-white">
                 Local Device Discovery
               </h2>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                 mDNS / SSDP
               </span>
             </div>
@@ -179,17 +177,6 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({
       )}
 
       {/* Modals */}
-      {pairingTarget && (
-        <PairingModal
-          device={pairingTarget}
-          onConfirm={() => {
-            onConnectDevice(pairingTarget);
-            setPairingTarget(null);
-          }}
-          onCancel={() => setPairingTarget(null)}
-        />
-      )}
-
       <ManualConnectModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
