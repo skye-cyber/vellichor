@@ -1,28 +1,15 @@
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { Device, SystemInfo, CacheInfo, InputCommand } from '../types';
-
-// Detect whether running in native Tauri runtime or browser webview
-let isTauriEnv = false;
-let tauriInvoke: (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>) | null = null;
-
-try {
-  if (typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)) {
-    isTauriEnv = true;
-    import('@tauri-apps/api/core')
-      .then((core) => {
-        tauriInvoke = core.invoke;
-      })
-      .catch(() => {
-        isTauriEnv = false;
-      });
-  }
-} catch {
-  isTauriEnv = false;
-}
 
 export class TauriNativeService {
   // Checks if native Tauri IPC bridge is available
   static isTauri(): boolean {
-    return isTauriEnv && tauriInvoke !== null;
+    try {
+      return typeof window !== 'undefined' && isTauri();
+    } catch {
+      return false;
+    }
   }
 
   // Dynamically queries local IP address using WebRTC candidate discovery for browser fallback
@@ -63,9 +50,9 @@ export class TauriNativeService {
   // Gathers comprehensive system telemetry, dynamic CPU architecture, and local network IPs
   static async getSystemInfo(): Promise<SystemInfo> {
     // Invoke native Rust backend if running inside Tauri
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<SystemInfo>('get_system_info');
+        return await invoke<SystemInfo>('get_system_info');
       } catch (e) {
         console.warn('Native get_system_info invocation failed, using dynamic web fallback:', e);
       }
@@ -98,80 +85,93 @@ export class TauriNativeService {
         arch = 'aarch64';
       } else if (userAgent.includes('arm')) {
         arch = 'arm';
-      } else if (userAgent.includes('x86_64') || userAgent.includes('win64') || userAgent.includes('x64')) {
-        arch = 'x86_64';
       }
     }
 
-    // Dynamic IP detection without hardcoded addresses
-    const dynamicIps: string[] = [];
-    const detectedIp = await this.resolveBrowserLocalIP();
-    if (detectedIp) {
-      dynamicIps.push(detectedIp);
-    } else if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
-      dynamicIps.push(window.location.hostname);
+    // Derived hostname based on platform
+    let hostname = 'Web Client';
+    if (typeof navigator !== 'undefined') {
+      const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
+      hostname = `${platformName} Device`;
     }
-    // Static local loopback always appended as standard interface
-    dynamicIps.push('127.0.0.1');
+
+    // Query candidate LAN IP
+    const localIP = await this.resolveBrowserLocalIP();
+    const local_ips: string[] = localIP ? [localIP] : ['127.0.0.1'];
+
+    // Retrieve or initialize unique client device ID
+    let device_id = '';
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('vellichor_device_id');
+      if (stored) {
+        device_id = stored;
+      } else {
+        device_id = `device_${Date.now()}`;
+        localStorage.setItem('vellichor_device_id', device_id);
+      }
+    } else {
+      device_id = `device_${Date.now()}`;
+    }
 
     return {
-      hostname: typeof window !== 'undefined' ? window.location.hostname || 'Vellichor-Device' : 'Vellichor-Device',
+      hostname,
       platform,
       arch,
       device_type,
-      local_ips: dynamicIps,
+      local_ips,
+      device_id,
     };
   }
 
-  // Scans the local network using UDP broadcast probing and ARP inspection
+  // Scans subnet for peer Vellichor devices via native UDP broadcast or local fallback
   static async scanNetwork(): Promise<Device[]> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        const raw = await tauriInvoke<any[]>('scan_network');
-        return raw.map((d) => ({
+        const raw = await invoke<any[]>('scan_network');
+        return raw.map((d: any) => ({
           id: d.id,
           name: d.name,
           type: d.device_type,
           platform: d.platform,
-          status: d.status,
+          status: (d.status || 'online') as any,
           ip: d.ip,
-          signalStrength: d.signal_strength,
-          lastSeen: d.last_seen,
+          port: d.port || 42426,
+          signalStrength: d.signal_strength || 80,
+          lastSeen: d.last_seen || 'just now',
         }));
       } catch (e) {
-        console.warn('Native scan_network failed, fallback to network discovery:', e);
+        console.warn('Native scan_network invocation failed:', e);
       }
     }
 
-    // Dynamic fallback when running purely in web browser
+    // Browser fallback
     const sys = await this.getSystemInfo();
-    const primaryIp = sys.local_ips[0] || '127.0.0.1';
-    return [
-      {
-        id: `peer-${primaryIp.replace(/\./g, '-')}`,
-        name: 'Local Network Peer',
-        type: 'laptop',
-        platform: 'linux',
-        status: 'online',
-        ip: primaryIp,
-        signalStrength: 90,
-        lastSeen: 'just now',
-      },
-    ];
+    const mockSelf: Device = {
+      id: sys.device_id || 'local-device',
+      name: `${sys.hostname} (This device)`,
+      type: sys.device_type as any,
+      platform: sys.platform as any,
+      status: 'online',
+      ip: sys.local_ips[0] || '127.0.0.1',
+      port: 42426,
+      signalStrength: 100,
+      lastSeen: 'just now',
+    };
+    return [mockSelf];
   }
 
-  // Interrogates the local application cache storage size
+  // Queries storage cache size
   static async getCacheSize(): Promise<CacheInfo> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        const raw = await tauriInvoke<any>('get_cache_size');
+        const raw = await invoke<any>('get_cache_size');
         return {
           sizeBytes: raw.size_bytes,
           filesCount: raw.files_count,
           lastCleared: raw.last_cleared,
         };
       } catch (e) {
-        console.warn('Native get_cache_size failed:', e);
+        console.warn('Native get_cache_size error:', e);
       }
     }
 
@@ -182,66 +182,62 @@ export class TauriNativeService {
     };
   }
 
-  // Clears cached files from the application cache directory
+  // Clears disk cache
   static async clearCache(): Promise<boolean> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<boolean>('clear_cache');
+        return await invoke<boolean>('clear_cache');
       } catch (e) {
-        console.warn('Native clear_cache failed:', e);
+        console.warn('Native clear_cache error:', e);
       }
     }
 
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('vellichor_cache_')) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach((k) => localStorage.removeItem(k));
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const devId = localStorage.getItem('vellichor_device_id');
+        localStorage.clear();
+        if (devId) localStorage.setItem('vellichor_device_id', devId);
+        return true;
+      } catch {
+        return false;
       }
-    } catch {
-      // Ignore
     }
     return true;
   }
 
-  // Synthesizes remote input actions on the host desktop
+  // Synthesizes remote input commands
   static async simulateInput(cmd: InputCommand): Promise<string> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<string>('simulate_input', { cmd });
+        return await invoke<string>('simulate_input', { cmd });
       } catch (e) {
         console.warn('Native simulate_input error:', e);
       }
     }
-    return `Simulated input: ${cmd.action}`;
+    return 'ok';
   }
 
-  // Reads persisted settings configuration from local filesystem
-  static async getStoredSettings(): Promise<string> {
-    if (this.isTauri() && tauriInvoke) {
+  // Retrieves stored settings from filesystem or localStorage fallback
+  static async getStoredSettings(): Promise<string | null> {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<string>('get_stored_settings');
+        return await invoke<string>('get_stored_settings');
       } catch (e) {
         console.warn('Native get_stored_settings error:', e);
       }
     }
 
     if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('vellichor_settings') || '{}';
+      return localStorage.getItem('vellichor_settings');
     }
-    return '{}';
+    return null;
   }
 
   // Saves user settings configuration to local filesystem
   static async saveStoredSettings(settingsJson: string): Promise<boolean> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<boolean>('save_stored_settings', { settingsJson });
+        return await invoke<boolean>('save_stored_settings', { settingsJson });
       } catch (e) {
         console.warn('Native save_stored_settings error:', e);
       }
@@ -255,9 +251,9 @@ export class TauriNativeService {
 
   // Resolves the default downloads folder path on the host
   static async getDownloadDirectory(): Promise<string> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<string>('get_download_directory');
+        return await invoke<string>('get_download_directory');
       } catch (e) {
         console.warn('Native get_download_directory error:', e);
       }
@@ -271,10 +267,10 @@ export class TauriNativeService {
     dataBytes: number[] | Uint8Array,
     isInitialChunk: boolean
   ): Promise<boolean> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
         const bytesArray = Array.from(dataBytes);
-        return await tauriInvoke<boolean>('write_file_chunk', {
+        return await invoke<boolean>('write_file_chunk', {
           filePath,
           dataBytes: bytesArray,
           isInitialChunk,
@@ -292,9 +288,9 @@ export class TauriNativeService {
     offset: number,
     length: number
   ): Promise<Uint8Array | null> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        const bytes = await tauriInvoke<number[]>('read_file_chunk', {
+        const bytes = await invoke<number[]>('read_file_chunk', {
           filePath,
           offset,
           length,
@@ -309,13 +305,67 @@ export class TauriNativeService {
 
   // Queries file size and metadata from filesystem
   static async getFileInfo(filePath: string): Promise<any> {
-    if (this.isTauri() && tauriInvoke) {
+    if (this.isTauri()) {
       try {
-        return await tauriInvoke<any>('get_file_info', { filePath });
+        return await invoke<any>('get_file_info', { filePath });
       } catch (e) {
         console.warn('Native get_file_info error:', e);
       }
     }
     return null;
+  }
+
+  // Sends a signal directly to another peer node via Tauri native HTTP dispatch
+  static async sendPeerSignal(
+    targetIp: string,
+    targetPort: number | undefined,
+    payload: any
+  ): Promise<boolean> {
+    if (this.isTauri()) {
+      try {
+        console.log('[TauriNativeService] Sending native peer signal to:', targetIp, 'port:', targetPort || 42426);
+        return await invoke<boolean>('send_peer_signal', {
+          targetIp,
+          targetPort: targetPort || 42426,
+          payload,
+        });
+      } catch (e) {
+        console.warn('Native send_peer_signal error:', e);
+      }
+    }
+    return false;
+  }
+
+  // Listens for incoming peer signals emitted by local Tauri node server
+  static async listenPeerSignal(callback: (payload: any) => void): Promise<(() => void) | null> {
+    if (this.isTauri()) {
+      try {
+        console.log('[TauriNativeService] Subscribing to native p2p-signal event...');
+        const unlisten = await listen<any>('p2p-signal', (event) => {
+          console.log('[TauriNativeService] Received p2p-signal event:', event.payload);
+          callback(event.payload);
+        });
+        console.log('[TauriNativeService] Successfully subscribed to p2p-signal event');
+        return unlisten;
+      } catch (e) {
+        console.warn('Native listenPeerSignal error:', e);
+      }
+    }
+    return null;
+  }
+
+  // Queries local peer node server telemetry
+  static async getNodeStatus(): Promise<any> {
+    if (this.isTauri()) {
+      try {
+        return await invoke<any>('get_node_status');
+      } catch (e) {
+        console.warn('Native get_node_status error:', e);
+      }
+    }
+    return null;
+  }
+  static async getVersion(): Promise<string> {
+    return invoke<string>('get_app_version');
   }
 }
