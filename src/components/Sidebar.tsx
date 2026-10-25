@@ -69,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>E2E Encrypted LAN</span>
         </div>
         <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-          Direct peer-to-peer communication powered by WebRTC & Tauri.
+          Direct peer-to-peer communication powered by WebRTC.
         </p>
       </div>
     </aside>
