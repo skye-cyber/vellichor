@@ -562,13 +562,7 @@ fn handle_websocket_connection(stream: TcpStream, app_handle: Arc<AppHandle>) {
                                 "roomId": room_id
                             });
 
-                            // Push to recent signals ring buffer
-                            push_recent_signal(forwarded.clone());
-
-                            // Emit signal to local Tauri webview
-                            let _ = app_handle.emit("p2p-signal", &forwarded);
-
-                            // Forward to destination WebSocket clients
+                            // Forward outgoing signal to destination WebSocket clients (excluding sender)
                             if let Some(target) = to {
                                 forward_ws_signal(target, &forwarded, Some(&client_id));
                             } else if let Some(room) = room_id {
