@@ -25,20 +25,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   connectedDevice,
   onWebShare,
 }) => {
-  const [localFiles, setLocalFiles] = useState<TransferFile[]>([
-    {
-      id: 'demo-1',
-      name: 'Project_Design_Mockups.fig',
-      size: 14.8 * 1024 * 1024,
-      type: 'application/octet-stream',
-    },
-    {
-      id: 'demo-2',
-      name: 'Vellichor_Architecture_Diagram.svg',
-      size: 420 * 1024,
-      type: 'image/svg+xml',
-    },
-  ]);
+  const [localFiles, setLocalFiles] = useState<TransferFile[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
 
