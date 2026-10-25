@@ -68,7 +68,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
   return (
     <div
-      className={`p-4 rounded-2xl border transition-all duration-200 bg-white dark:bg-vellichor-card ${
+      className={`p-4 sm:p-2 md:p-4 rounded-2xl border transition-all duration-200 bg-white dark:bg-vellichor-card ${
         isConnected
           ? 'border-secondary shadow-glow-secondary'
           : 'border-gray-200 dark:border-vellichor-border hover:border-primary/50 shadow-sm hover:shadow-balanced'
@@ -76,18 +76,18 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     >
       <div className="flex items-start justify-between">
         {/* Left: Device Icon & Info */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center xl:space-x-3">
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+            className={`size-12 sm:size-10 md:size-12 rounded-xl flex items-center justify-center ${
               isConnected
                 ? 'bg-secondary/15 text-secondary'
                 : 'bg-primary/10 text-primary'
             }`}
           >
-            <Icon className="w-6 h-6" />
+            <Icon className="size-6 sm:size-4 md:size-6" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 md:space-x-2">
               <h3 className="font-semibold text-gray-900 dark:text-white text-base">
                 {device.name}
               </h3>
@@ -95,7 +95,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-secondary fill-secondary/20" />
               )}
             </div>
-            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <div className="flex items-center space-x-2 sm:space-x-0 md:space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               <span className="font-mono">{device.ip}</span>
               <span>•</span>
               <span className="capitalize">{device.platform}</span>
@@ -106,12 +106,12 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
         {/* Right: Status Pill & Signal */}
         <div className="flex flex-col items-end space-y-1">
           <span
-            className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center space-x-1.5 ${statusInfo.bg}`}
+            className={`text-[11px] font-semibold px-1 md:px-2 py-0.5 rounded-full border flex items-center space-x-1 md:space-x-1.5 ${statusInfo.bg}`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
             <span>{statusInfo.text}</span>
           </span>
-          <div className="flex items-center space-x-1 text-[11px] text-gray-400">
+          <div className="flex items-center space-x-0.5 md:space-x-1 text-[11px] text-gray-400">
             <Wifi className="w-3 h-3" />
             <span>{device.signalStrength}%</span>
           </div>
