@@ -3,6 +3,7 @@ pub mod cache;
 pub mod discovery;
 pub mod files;
 pub mod input;
+pub mod node_server;
 pub mod settings;
 pub mod system;
 pub mod types;
@@ -12,6 +13,7 @@ pub use cache::*;
 pub use discovery::*;
 pub use files::*;
 pub use input::*;
+pub use node_server::*;
 pub use settings::*;
 pub use system::*;
 pub use types::*;
@@ -34,6 +36,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 /// Cross-platform: the frontend may query it even on mobile.
 struct AppState {
+     #[allow(dead_code)]
     is_quitting: AtomicBool,
 }
 
@@ -238,14 +241,18 @@ fn wire_main_window<R: Runtime>(app: &AppHandle<R>) {
  * so the original `builder` value flows through unchanged.
  */
 fn build_app() -> tauri::Builder<tauri::Wry> {
-    let builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
     // Core application logging plugin
     // .plugin(tauri_plugin_log::Builder::default().build())
     // MUST be first. Before other plugins, before .manage().
-    .plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}))
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|_app, _argv, _cwd| {}));
+    }
+    builder = builder
     .plugin(
         tauri_plugin_log::Builder::new()
-        .level(log::LevelFilter::Info)
+        .level(log::LevelFilter::Debug)
         .targets([
             tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
                 file_name: Some("openreel".into()),
@@ -298,10 +305,16 @@ pub fn run() {
             files::get_download_directory,
             files::write_file_chunk,
             files::read_file_chunk,
-            files::get_file_info
+            files::get_file_info,
+            // Decentralized P2P node server signaling commands
+            node_server::send_peer_signal,
+            node_server::get_node_status
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Start embedded P2P peer node server on port 42426
+            node_server::start_node_server(handle.clone());
 
             /* Desktop-only setup. Everything below touches APIs that are
              * `#[cfg(desktop)]`-gated inside Tauri itself (tray, window icons, global shortcuts, menu).

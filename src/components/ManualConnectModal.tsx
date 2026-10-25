@@ -14,7 +14,7 @@ export const ManualConnectModal: React.FC<ManualConnectModalProps> = ({
   onConnect,
 }) => {
   const [ipAddress, setIpAddress] = useState('192.168.1.');
-  const [port, setPort] = useState('3000');
+  const [port, setPort] = useState('42426');
   const [deviceName, setDeviceName] = useState('Manual Device');
 
   if (!isOpen) return null;
@@ -23,13 +23,16 @@ export const ManualConnectModal: React.FC<ManualConnectModalProps> = ({
     e.preventDefault();
     if (!ipAddress.trim()) return;
 
+    const parsedPort = parseInt(port.trim(), 10) || 42426;
+    const cleanIp = ipAddress.trim();
     const manualDevice: Device = {
-      id: `manual-${Date.now()}`,
+      id: `manual-${cleanIp.replace(/[^a-z0-9]/gi, '-')}`,
       name: deviceName.trim() || 'Custom Device',
       type: 'laptop',
       platform: 'linux',
       status: 'online',
-      ip: `${ipAddress}:${port}`,
+      ip: cleanIp,
+      port: parsedPort,
       signalStrength: 90,
       lastSeen: 'just now',
     };
@@ -90,7 +93,7 @@ export const ManualConnectModal: React.FC<ManualConnectModalProps> = ({
                 type="text"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                placeholder="3000"
+                placeholder="42426"
                 className="w-full px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border text-sm text-gray-900 dark:text-white font-mono focus:outline-none focus:border-primary"
               />
             </div>

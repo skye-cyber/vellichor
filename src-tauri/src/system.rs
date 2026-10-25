@@ -69,11 +69,15 @@ pub fn get_system_info() -> SystemInfo {
     // Collect all dynamic network interface IPv4 addresses
     let local_ips = get_all_local_ips();
 
+    // Query or generate persistent unique hardware/device identifier
+    let device_id = crate::discovery::get_or_create_device_id();
+
     SystemInfo {
         hostname,
         platform,
         arch,
         device_type,
         local_ips,
+        device_id,
     }
 }

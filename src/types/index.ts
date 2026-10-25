@@ -9,6 +9,7 @@ export interface Device {
   platform: PlatformType;
   status: DeviceStatus;
   ip: string;
+  port?: number;
   signalStrength: number;
   lastSeen: string;
 }
@@ -72,6 +73,12 @@ export interface SystemInfo {
   arch: string;
   device_type: string;
   local_ips: string[];
+  device_id?: string;
+}
+
+export interface PairingRequest {
+  pin: string;
+  fromDevice: Device;
 }
 
 export interface TransferFile {

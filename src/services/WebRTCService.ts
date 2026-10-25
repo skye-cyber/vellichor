@@ -36,6 +36,21 @@ export type PeerPairedListener = (device: Device) => void;
 export type PeerUnpairedListener = () => void;
 export type PartnerStateListener = (state: PartnerState) => void;
 
+export interface PairingRequestEvent {
+  pin: string;
+  fromDevice: Device;
+}
+
+export interface PairingResponseEvent {
+  type: 'accept' | 'decline' | 'cancel';
+  pin?: string;
+  fromDevice?: Device;
+  reason?: string;
+}
+
+export type PairingRequestListener = (event: PairingRequestEvent) => void;
+export type PairingResponseListener = (event: PairingResponseEvent) => void;
+
 class WebRTCServiceClass {
   private peerConnection: any = null;
   private dataChannels: Map<string, any> = new Map();
@@ -46,6 +61,9 @@ class WebRTCServiceClass {
   private peerPairedListeners: Set<PeerPairedListener> = new Set();
   private peerUnpairedListeners: Set<PeerUnpairedListener> = new Set();
   private partnerStateListeners: Set<PartnerStateListener> = new Set();
+  private pairingRequestListeners: Set<PairingRequestListener> = new Set();
+  private pairingResponseListeners: Set<PairingResponseListener> = new Set();
+  private hiddenVideoElement: HTMLVideoElement | null = null;
 
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
@@ -325,6 +343,60 @@ class WebRTCServiceClass {
     const { from, signal } = payload;
     if (!signal) return;
 
+    // Mutual pairing protocol handshake signals
+    if (signal.type === 'PAIR_REQUEST') {
+      const fromDev = signal.fromDevice || {
+        id: payload.fromDeviceId || from,
+        name: 'Remote Device',
+        type: 'laptop',
+        platform: 'linux',
+        status: 'online',
+        ip: 'Remote',
+        signalStrength: 90,
+        lastSeen: 'just now',
+      };
+      if (fromDev.ip && fromDev.ip !== 'Remote') {
+        SignalingService.registerPeerDevice(fromDev.id, fromDev.ip, (fromDev as any).port || 42426);
+      }
+      this.pairingRequestListeners.forEach((cb) =>
+        cb({ pin: signal.pin, fromDevice: fromDev })
+      );
+      return;
+    }
+
+    if (signal.type === 'PAIR_ACCEPT') {
+      if (signal.fromDevice?.ip && signal.fromDevice.ip !== 'Remote') {
+        SignalingService.registerPeerDevice(
+          signal.fromDevice.id,
+          signal.fromDevice.ip,
+          (signal.fromDevice as any).port || 42426
+        );
+      }
+      this.pairingResponseListeners.forEach((cb) =>
+        cb({ type: 'accept', pin: signal.pin, fromDevice: signal.fromDevice })
+      );
+      return;
+    }
+
+    if (signal.type === 'PAIR_DECLINE') {
+      this.pairingResponseListeners.forEach((cb) =>
+        cb({ type: 'decline', pin: signal.pin, reason: signal.reason })
+      );
+      return;
+    }
+
+    if (signal.type === 'PAIR_CANCEL') {
+      this.pairingResponseListeners.forEach((cb) =>
+        cb({ type: 'cancel', pin: signal.pin })
+      );
+      return;
+    }
+
+    if (signal.type === 'UNPAIR_NOTIFY') {
+      this.handleUnpaired();
+      return;
+    }
+
     // Handle direct transport frames (bypasses WebRTC on Linux/WebKitGTK)
     if (signal.directChannel) {
       this.activePeerId = payload.fromDeviceId || from;
@@ -464,19 +536,30 @@ class WebRTCServiceClass {
 
     if (!options?.useSyntheticFallback && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
       try {
+        // Standard Linux desktop portals (xdg-desktop-portal) do not support audio screencast.
+        // We capture video explicitly without audio to ensure the portal selection prompt displays reliably.
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: {
             width: { ideal: width },
             height: { ideal: height },
             frameRate: { ideal: options?.fps || 60 },
           },
-          audio: true,
+          audio: false,
         });
       } catch (err: any) {
-        if (err.name === 'NotAllowedError') {
+        if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+          // User clicked "Cancel" on the portal/window picker dialog
           throw err;
         }
-        console.warn('Native getDisplayMedia unavailable, using interactive virtual display:', err);
+        console.warn('getDisplayMedia attempt failed, trying fallback constraints:', err);
+        try {
+          stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        } catch (innerErr: any) {
+          if (innerErr.name === 'NotAllowedError' || innerErr.name === 'AbortError') {
+            throw innerErr;
+          }
+          console.warn('Native getDisplayMedia unavailable, using interactive virtual display:', innerErr);
+        }
       }
     }
 
@@ -511,15 +594,36 @@ class WebRTCServiceClass {
   // Periodically extracts canvas/video frames and streams them over Direct Transport for WebKitGTK
   private startDirectFrameStreaming(stream: MediaStream, fps: number) {
     if (this.broadcastFrameTimer) clearInterval(this.broadcastFrameTimer);
+    if (this.hiddenVideoElement) {
+      this.hiddenVideoElement.pause();
+      this.hiddenVideoElement.srcObject = null;
+      this.hiddenVideoElement.remove();
+      this.hiddenVideoElement = null;
+    }
 
     const video = document.createElement('video');
     video.srcObject = stream;
     video.muted = true;
     video.playsInline = true;
-    video.play().catch(() => {});
+    video.autoplay = true;
+
+    // WebKitGTK requires the video element to be attached to the DOM to decode and advance frames
+    video.style.position = 'fixed';
+    video.style.top = '-9999px';
+    video.style.left = '-9999px';
+    video.style.width = '1px';
+    video.style.height = '1px';
+    video.style.opacity = '0';
+    video.style.pointerEvents = 'none';
+    document.body.appendChild(video);
+    this.hiddenVideoElement = video;
+
+    video.play().catch((err) => {
+      console.warn('Hidden video play notice:', err);
+    });
 
     const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     this.broadcastFrameTimer = setInterval(() => {
       if (video.videoWidth > 0 && video.videoHeight > 0 && ctx) {
@@ -706,6 +810,13 @@ class WebRTCServiceClass {
       this.broadcastFrameTimer = null;
     }
 
+    if (this.hiddenVideoElement) {
+      this.hiddenVideoElement.pause();
+      this.hiddenVideoElement.srcObject = null;
+      this.hiddenVideoElement.remove();
+      this.hiddenVideoElement = null;
+    }
+
     if (this.localStream) {
       this.localStream.getTracks().forEach((t) => t.stop());
       this.localStream = null;
@@ -853,6 +964,57 @@ class WebRTCServiceClass {
     };
   }
 
+  onPairingRequest(callback: PairingRequestListener): () => void {
+    this.pairingRequestListeners.add(callback);
+    return () => {
+      this.pairingRequestListeners.delete(callback);
+    };
+  }
+
+  onPairingResponse(callback: PairingResponseListener): () => void {
+    this.pairingResponseListeners.add(callback);
+    return () => {
+      this.pairingResponseListeners.delete(callback);
+    };
+  }
+
+  sendPairRequest(targetDeviceId: string, pin: string) {
+    if (this.myDevice) {
+      SignalingService.joinRoom(targetDeviceId);
+      SignalingService.sendSignal(targetDeviceId, {
+        type: 'PAIR_REQUEST',
+        pin,
+        fromDevice: this.myDevice,
+      });
+    }
+  }
+
+  sendPairAccept(targetDeviceId: string, pin: string) {
+    if (this.myDevice) {
+      SignalingService.joinRoom(targetDeviceId);
+      SignalingService.sendSignal(targetDeviceId, {
+        type: 'PAIR_ACCEPT',
+        pin,
+        fromDevice: this.myDevice,
+      });
+    }
+  }
+
+  sendPairDecline(targetDeviceId: string, pin: string, reason?: string) {
+    SignalingService.sendSignal(targetDeviceId, {
+      type: 'PAIR_DECLINE',
+      pin,
+      reason: reason || 'Connection declined by remote device',
+    });
+  }
+
+  sendPairCancel(targetDeviceId: string, pin?: string) {
+    SignalingService.sendSignal(targetDeviceId, {
+      type: 'PAIR_CANCEL',
+      pin,
+    });
+  }
+
   onStateChange(callback: (state: any) => void): () => void {
     this.stateChangeListeners.add(callback);
     callback(this.connectionState);
@@ -863,6 +1025,12 @@ class WebRTCServiceClass {
 
   // Terminates the peer connection and notifies partner device of unpairing
   close() {
+    if (this.activePeerId) {
+      try {
+        SignalingService.sendSignal(this.activePeerId, { type: 'UNPAIR_NOTIFY' });
+      } catch {}
+    }
+
     try {
       this.sendData('control', { type: 'UNPAIR_NOTIFY' });
     } catch {}

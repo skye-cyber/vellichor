@@ -5,13 +5,27 @@ import { SignalingService } from '../services/SignalingService';
 import { WebRTCService } from '../services/WebRTCService';
 import { SettingsService } from '../services/SettingsService';
 
+export interface OutgoingPairingState {
+  device: Device;
+  pin: string;
+  status: 'waiting' | 'accepted' | 'declined' | 'timeout';
+}
+
+export interface IncomingPairingState {
+  pin: string;
+  fromDevice: Device;
+}
+
 export const useDeviceDiscovery = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [lastScanTime, setLastScanTime] = useState<Date>(new Date());
+  const [incomingPairingRequest, setIncomingPairingRequest] = useState<IncomingPairingState | null>(null);
+  const [outgoingPairing, setOutgoingPairing] = useState<OutgoingPairingState | null>(null);
   const localScanRef = useRef<Device[]>([]);
+  const pairingTimeoutRef = useRef<any>(null);
 
   // Merges local network discovery results with signaling server online peer registry
   const mergeDevices = useCallback((local: Device[], signalingPeers: any[]) => {
@@ -43,6 +57,7 @@ export const useDeviceDiscovery = () => {
       map.set(mergedDevice.id, mergedDevice);
       if (mergedDevice.ip && mergedDevice.ip !== 'Remote (Signaling)') {
         map.set(mergedDevice.ip, mergedDevice);
+        SignalingService.registerPeerDevice(mergedDevice.id, mergedDevice.ip, mergedDevice.port || 42426);
       }
     }
 
@@ -63,13 +78,19 @@ export const useDeviceDiscovery = () => {
       ]);
 
       localScanRef.current = scanned;
+      for (const d of scanned) {
+        if (d.ip) {
+          SignalingService.registerPeerDevice(d.id, d.ip, d.port || 42426);
+        }
+      }
       setSystemInfo(sys);
       setLastScanTime(new Date());
 
       // Register local device profile for mutual pairing handshakes and presence
       if (sys) {
+        const devId = sys.device_id || `device-${sys.hostname.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
         const myDev: Device = {
-          id: `device-${sys.hostname.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+          id: devId,
           name: sys.hostname,
           type: sys.device_type as any,
           platform: sys.platform as any,
@@ -81,6 +102,7 @@ export const useDeviceDiscovery = () => {
 
         WebRTCService.setMyDevice(myDev);
 
+        SignalingService.joinRoom(myDev.id);
         SignalingService.registerPresence({
           deviceId: myDev.id,
           name: sys.hostname,
@@ -101,13 +123,53 @@ export const useDeviceDiscovery = () => {
   useEffect(() => {
     // Initial signaling connect & scan
     const settings = SettingsService.getSettings();
-    SignalingService.connect(settings.signalingServerUrl || 'http://localhost:3000');
+    SignalingService.connect(settings.signalingServerUrl || 'http://localhost:42426');
 
     startScan();
 
     // Listen to signaling peer updates
     const unsubPeers = SignalingService.onPeersUpdate((peers) => {
       mergeDevices(localScanRef.current, peers);
+    });
+
+    // Listen to incoming pairing requests from remote devices
+    const unsubPairReq = WebRTCService.onPairingRequest((req) => {
+      setIncomingPairingRequest({
+        pin: req.pin,
+        fromDevice: req.fromDevice,
+      });
+    });
+
+    // Listen to pairing responses from target device
+    const unsubPairResp = WebRTCService.onPairingResponse((resp) => {
+      if (resp.type === 'accept') {
+        setOutgoingPairing((prev) => {
+          if (!prev) return null;
+          const target = prev.device;
+          WebRTCService.connectToPeer(target.id);
+          setConnectedDevice(target);
+          SettingsService.addConnectionHistory({
+            deviceName: target.name,
+            deviceType: target.type,
+            platform: target.platform,
+            ip: target.ip,
+            lastConnected: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            connectionCount: 1,
+            trusted: true,
+          });
+
+          // Dismiss after showing success state
+          setTimeout(() => {
+            setOutgoingPairing(null);
+          }, 800);
+
+          return { ...prev, status: 'accepted' };
+        });
+      } else if (resp.type === 'decline') {
+        setOutgoingPairing((prev) => (prev ? { ...prev, status: 'declined' } : null));
+      } else if (resp.type === 'cancel') {
+        setIncomingPairingRequest(null);
+      }
     });
 
     // Listen to mutual two-way pairing events from WebRTC data channel handshake
@@ -137,33 +199,90 @@ export const useDeviceDiscovery = () => {
 
     return () => {
       unsubPeers();
+      unsubPairReq();
+      unsubPairResp();
       unsubPaired();
       unsubUnpaired();
       unsubState();
+      if (pairingTimeoutRef.current) clearTimeout(pairingTimeoutRef.current);
     };
   }, [startScan, mergeDevices]);
 
+  // Initiates mutual pairing with target device by generating a verification PIN and sending prompt
+  const initiatePairing = useCallback((device: Device) => {
+    if (pairingTimeoutRef.current) clearTimeout(pairingTimeoutRef.current);
+
+    const pin = `${Math.floor(100 + Math.random() * 900)} ${Math.floor(100 + Math.random() * 900)}`;
+    if (device.ip && device.ip !== 'Remote (Signaling)') {
+      SignalingService.registerPeerDevice(device.id, device.ip, device.port || 42426);
+    }
+    console.log("Sent pair request to:", device)
+    setOutgoingPairing({
+      device,
+      pin,
+      status: 'waiting',
+    });
+
+    WebRTCService.sendPairRequest(device.id, pin);
+
+    // 25 second timeout for response
+    pairingTimeoutRef.current = setTimeout(() => {
+      setOutgoingPairing((prev) => {
+        if (prev && prev.status === 'waiting') {
+          return { ...prev, status: 'timeout' };
+        }
+        return prev;
+      });
+    }, 25000);
+  }, []);
+
+  // Accepts incoming connection request from remote device
+  const acceptPairing = useCallback(async () => {
+    if (!incomingPairingRequest) return;
+    const { fromDevice, pin } = incomingPairingRequest;
+    console.log("[INC] From:", incomingPairingRequest)
+    WebRTCService.sendPairAccept(fromDevice.id, pin);
+    await WebRTCService.connectToPeer(fromDevice.id);
+    setConnectedDevice(fromDevice);
+
+    await SettingsService.addConnectionHistory({
+      deviceName: fromDevice.name,
+      deviceType: fromDevice.type,
+      platform: fromDevice.platform,
+      ip: fromDevice.ip,
+      lastConnected: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      connectionCount: 1,
+      trusted: true,
+    });
+
+    setIncomingPairingRequest(null);
+  }, [incomingPairingRequest]);
+
+  // Declines incoming connection request
+  const declinePairing = useCallback(() => {
+    if (!incomingPairingRequest) return;
+    WebRTCService.sendPairDecline(
+      incomingPairingRequest.fromDevice.id,
+      incomingPairingRequest.pin,
+      'Connection declined by user'
+    );
+    setIncomingPairingRequest(null);
+  }, [incomingPairingRequest]);
+
+  // Cancels an outgoing pairing request initiated from this device
+  const cancelOutgoingPairing = useCallback(() => {
+    if (pairingTimeoutRef.current) clearTimeout(pairingTimeoutRef.current);
+    if (outgoingPairing) {
+      WebRTCService.sendPairCancel(outgoingPairing.device.id, outgoingPairing.pin);
+      setOutgoingPairing(null);
+    }
+  }, [outgoingPairing]);
+
   const connectToDevice = useCallback(
     async (device: Device) => {
-      try {
-        await WebRTCService.connectToPeer(device.id);
-        setConnectedDevice(device);
-
-        // Add to history
-        await SettingsService.addConnectionHistory({
-          deviceName: device.name,
-          deviceType: device.type,
-          platform: device.platform,
-          ip: device.ip,
-          lastConnected: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          connectionCount: 1,
-          trusted: true,
-        });
-      } catch (err) {
-        console.error('Failed to connect to device:', err);
-      }
+      initiatePairing(device);
     },
-    []
+    [initiatePairing]
   );
 
   const disconnectDevice = useCallback(() => {
@@ -180,5 +299,11 @@ export const useDeviceDiscovery = () => {
     startScan,
     connectToDevice,
     disconnectDevice,
+    incomingPairingRequest,
+    outgoingPairing,
+    initiatePairing,
+    acceptPairing,
+    declinePairing,
+    cancelOutgoingPairing,
   };
 };

@@ -8,6 +8,7 @@ pub struct SystemInfo {
     pub arch: String,
     pub device_type: String,
     pub local_ips: Vec<String>,
+    pub device_id: String,
 }
 
 // Discovered device representation across LAN UDP broadcast and ARP discovery
@@ -21,6 +22,7 @@ pub struct DiscoveredDevice {
     pub ip: String,
     pub signal_strength: u8,
     pub last_seen: String,
+    pub port: u16,
 }
 
 // Cache storage information for the application cache directory

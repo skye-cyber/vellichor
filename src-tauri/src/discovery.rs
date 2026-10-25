@@ -65,7 +65,7 @@ pub fn ensure_discovery_listener_running() {
                             name: my_sys.hostname.clone(),
                             device_type: my_sys.device_type.clone(),
                             platform: my_sys.platform.clone(),
-                            port: 42424,
+                            port: crate::node_server::DEFAULT_NODE_PORT,
                             ip: get_primary_local_ip(),
                         };
                         if let Ok(resp_bytes) = serde_json::to_vec(&response) {
@@ -111,7 +111,7 @@ pub async fn scan_network() -> Result<Vec<DiscoveredDevice>, String> {
         name: my_sys.hostname.clone(),
         device_type: my_sys.device_type.clone(),
         platform: my_sys.platform.clone(),
-        port: 42424,
+        port: crate::node_server::DEFAULT_NODE_PORT,
         ip: get_primary_local_ip(),
     };
     let req_bytes = serde_json::to_vec(&req).map_err(|e| e.to_string())?;
@@ -159,6 +159,7 @@ pub async fn scan_network() -> Result<Vec<DiscoveredDevice>, String> {
                         ip: msg.ip.unwrap_or_else(|| src.ip().to_string()),
                         signal_strength: 95,
                         last_seen: "just now".to_string(),
+                        port: msg.port,
                     };
                     devices.insert(msg.id, dev);
                 }
@@ -190,6 +191,7 @@ pub async fn scan_network() -> Result<Vec<DiscoveredDevice>, String> {
                 ip: ip.clone(),
                 signal_strength: 88,
                 last_seen: "just now".to_string(),
+                port: crate::node_server::DEFAULT_NODE_PORT,
             };
             devices.insert(dev.id.clone(), dev);
         }

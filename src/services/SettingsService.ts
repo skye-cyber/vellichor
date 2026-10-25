@@ -10,7 +10,7 @@ class SettingsServiceClass {
         autoConnect: true,
         discoveryMode: 'all',
         streamQuality: 'balanced',
-        signalingServerUrl: 'http://localhost:3000',
+        signalingServerUrl: '',
         encryption: true,
         requirePairing: true,
         saveHistory: true,

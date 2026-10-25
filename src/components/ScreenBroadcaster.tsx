@@ -25,6 +25,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
   partnerBroadcasting,
 }) => {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
   const [resolution, setResolution] = useState<'720p' | '1080p' | 'original'>('1080p');
   const [fps, setFps] = useState<30 | 60>(60);
   const [includeAudio, setIncludeAudio] = useState(true);
@@ -34,6 +35,13 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
   const [error, setError] = useState<string | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (previewVideoRef.current && activeStream) {
+      previewVideoRef.current.srcObject = activeStream;
+      previewVideoRef.current.play().catch(() => {});
+    }
+  }, [activeStream]);
 
   useEffect(() => {
     WebRTCService.allowRemoteControl = allowControl;
@@ -77,11 +85,8 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
       });
 
       if (stream) {
+        setActiveStream(stream);
         setIsBroadcasting(true);
-        if (previewVideoRef.current) {
-          previewVideoRef.current.srcObject = stream;
-          previewVideoRef.current.play().catch(() => {});
-        }
 
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
@@ -91,7 +96,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
         }
       }
     } catch (err: any) {
-      if (err.name !== 'NotAllowedError') {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
         setError(err.message || 'Failed to capture screen');
       }
     }
@@ -99,6 +104,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
   const stopSharing = () => {
     WebRTCService.stopScreenCapture();
+    setActiveStream(null);
     if (previewVideoRef.current) {
       previewVideoRef.current.srcObject = null;
     }

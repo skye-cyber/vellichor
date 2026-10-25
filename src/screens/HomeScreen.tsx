@@ -9,9 +9,7 @@ import {
     ArrowRight,
     //ShieldCheck,
     //Zap,
-    Tablet,
     Laptop,
-    TabletSmartphone,
     Smartphone,
 } from 'lucide-react';
 import { Device, SystemInfo } from '../types';
@@ -244,7 +242,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         >
                             <div className="flex items-center space-x-2 sm:space-x-3 truncate">
                                 <div className="size-8 sm:size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                    {device?.type === 'phone' ? <Smartphone className="w-5 h-5"/> : <Laptop className="w-5 h-5" />}
+                                    {device?.type === 'phone' ? <Smartphone className="w-5 h-5" /> : <Laptop className="w-5 h-5" />}
                                 </div>
                                 <div className="truncate">
                                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">

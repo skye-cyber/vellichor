@@ -8,6 +8,8 @@ import { ScreenShareScreen } from './screens/ScreenShareScreen';
 import { ControlScreen } from './screens/ControlScreen';
 import { FilesScreen } from './screens/FilesScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { IncomingPairingModal } from './components/IncomingPairingModal';
+import { PairingModal } from './components/PairingModal';
 import { useDeviceDiscovery } from './hooks/useDeviceDiscovery';
 import { useSettings } from './hooks/useSettings';
 import { SignalingService } from './services/SignalingService';
@@ -28,6 +30,11 @@ export const App: React.FC = () => {
         startScan,
         connectToDevice,
         disconnectDevice,
+        incomingPairingRequest,
+        outgoingPairing,
+        acceptPairing,
+        declinePairing,
+        cancelOutgoingPairing,
     } = useDeviceDiscovery();
 
     const { settings, updateSetting } = useSettings();
@@ -144,6 +151,26 @@ export const App: React.FC = () => {
                     currentTab={currentTab}
                     setCurrentTab={setCurrentTab}
                     activeTransferCount={activeTransferCount}
+                />
+            )}
+
+            {/* Global Incoming Connection Prompt Modal */}
+            {incomingPairingRequest && (
+                <IncomingPairingModal
+                    request={incomingPairingRequest}
+                    onAccept={acceptPairing}
+                    onDecline={declinePairing}
+                />
+            )}
+
+            {/* Global Outgoing Pairing Modal */}
+            {outgoingPairing && (
+                <PairingModal
+                    device={outgoingPairing.device}
+                    pin={outgoingPairing.pin}
+                    status={outgoingPairing.status}
+                    onCancel={cancelOutgoingPairing}
+                    onRetry={() => connectToDevice(outgoingPairing.device)}
                 />
             )}
         </div>

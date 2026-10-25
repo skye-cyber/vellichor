@@ -10,7 +10,7 @@ interface WebShareModalProps {
 
 export const WebShareModal: React.FC<WebShareModalProps> = ({
   file,
-  serverUrl = 'http://localhost:3000',
+  serverUrl = 'http://localhost:42426',
   onClose,
 }) => {
   const [copied, setCopied] = useState(false);

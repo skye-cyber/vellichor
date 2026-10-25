@@ -1,12 +1,13 @@
 import { Transfer, TransferFile } from '../types';
 import { WebRTCService } from './WebRTCService';
 import { TauriNativeService } from './TauriNativeService';
+import { SettingsService } from './SettingsService';
 
 export class FileTransferServiceClass {
   private transfers: Map<string, Transfer> = new Map();
   private listeners: Set<(transfers: Transfer[]) => void> = new Set();
   private incomingBuffers: Map<string, { chunks: Uint8Array[]; targetPath?: string; metadata: any }> = new Map();
-  private activeDownloadDir: string = 'Downloads';
+  private activeDownloadDir: string = SettingsService.getSettings().downloadPath || 'Downloads';
 
   constructor() {
     // Intercept incoming data on WebRTC file data channel

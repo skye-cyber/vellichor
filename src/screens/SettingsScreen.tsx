@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Wifi,
     Lock,
@@ -11,17 +11,18 @@ import {
     RotateCcw,
     Trash2,
     Check,
-    AlertTriangle,
-    FileText,
-    Heart,
-    Server,
-    Smartphone,
+    // AlertTriangle,
+    // FileText,
+    // Heart,
+    // Server,
+    // Smartphone,
     Keyboard,
 } from 'lucide-react';
 import { useSettings } from '../hooks/useSettings';
 import { SectionHeader } from '../components/SectionHeader';
 import { ToggleSetting } from '../components/ToggleSetting';
 import { SelectSetting } from '../components/SelectSetting';
+import { TauriNativeService } from '../services/TauriNativeService';
 
 export const SettingsScreen: React.FC = () => {
     const {
@@ -41,6 +42,7 @@ export const SettingsScreen: React.FC = () => {
     const [notification, setNotification] = useState<string | null>(null);
     const [importModalOpen, setImportModalOpen] = useState(false);
     const [importJson, setImportJson] = useState('');
+    const [appVersion, setAppVersion] = useState<string | null>(null)
 
     const showToast = (msg: string) => {
         setNotification(msg);
@@ -80,6 +82,15 @@ export const SettingsScreen: React.FC = () => {
             showToast('Settings reset to factory defaults.');
         }
     };
+
+    const setVersion = useCallback(async () => {
+        const version = await TauriNativeService.getVersion()
+        if (version) setAppVersion(version)
+    }, [])
+
+    useEffect(() => {
+        setVersion()
+    }, [])
 
     if (loading) {
         return (
@@ -401,11 +412,11 @@ export const SettingsScreen: React.FC = () => {
             {/* Footer */}
             <div className="text-center py-6 text-xs text-gray-400 space-y-1">
                 <div className="flex items-center justify-center space-x-1.5 font-semibold text-gray-500">
-                    <span>Vellichor v0.1.0</span>
+                    <span>Vellichor v{appVersion ? appVersion : '-'}</span>
                     <span>•</span>
                     <span className="text-primary font-bold">Unified</span>
                 </div>
-                <p>© 2026 Vellichor • Where screens drift between devices</p>
+                <p>© 2026 Vellichor</p>
             </div>
 
             {/* Import Modal */}

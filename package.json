@@ -4,30 +4,20 @@
   "description": "Vellichor is a cross-device control application that allows you to share screens and control devices between your phone and laptop bidirectionally",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "server",
-    "shared"
-  ],
   "scripts": {
-    "dev:server": "cd server && npm run dev",
-    "dev": "concurrently \"npm:dev:*\"",
+    "dev": "concurrently \"npm:dev:react\" \"npm:dev:tauri\"",
     "dev:react": "vite --host 0.0.0.0",
-    "dev:styles": "tailwindcss -i ./src/ui/styles/config.css -o ./src/ui/styles/global.css --watch",
     "dev:types": "tsc --noEmit --watch",
-    "dev:core": "tsc -p tsconfig.core.json --watch",
     "dev:tauri": "tauri dev",
-    "build": "npm run clean && npm run type-check && npm run build:all",
-    "build:all": "npm-run-all build:core build:react build:tauri",
-    "build:core": "tsc -p tsconfig.core.json",
+    "build": "npm run clean && npm run type-check && npm run build:react",
     "build:react": "vite build",
     "build:tauri": "tauri build",
     "package": "npm run build",
     "clean": "rimraf dist",
     "type-check": "tsc --noEmit",
-    "styles": "tailwindcss -i ./src/ui/styles/config.css -o ./src/ui/styles/global.css --minify",
     "tauri": "tauri",
-    "cert:gen": "keytool -genkey -v -keystore ~/vellichor-upload-keystore.jks -alias vellichor -keyalg RSA -keysize 2048 -validity 10000",
-    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css}\""
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css}\"",
+    "cert:gen": "keytool -genkey -v -keystore ~/vellichor-upload-keystore.jks -alias vellichor -keyalg RSA -keysize 2048 -validity 10000"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

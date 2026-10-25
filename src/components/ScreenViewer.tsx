@@ -230,7 +230,7 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
       </div>
 
       {/* Video Content, Hardware Canvas, or Standby HUD */}
-      {remoteStream ? (
+      {remoteStream && (
         <video
           ref={videoRef}
           autoPlay
@@ -238,12 +238,17 @@ export const ScreenViewer: React.FC<ScreenViewerProps> = ({ device }) => {
           muted
           className="w-full h-full object-contain pointer-events-none select-none bg-black"
         />
-      ) : hasDirectFrame ? (
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full object-contain pointer-events-none select-none bg-black"
-        />
-      ) : (
+      )}
+
+      {/* Hardware Canvas: Always mounted to guarantee zero-latency frame ingestion without unmount traps */}
+      <canvas
+        ref={canvasRef}
+        className={`w-full h-full object-contain pointer-events-none select-none bg-black ${
+          !remoteStream && hasDirectFrame ? 'block' : 'hidden'
+        }`}
+      />
+
+      {!remoteStream && !hasDirectFrame && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-gray-400 space-y-4 bg-slate-950">
           <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-primary animate-pulse">
             <Tv className="w-10 h-10" />
