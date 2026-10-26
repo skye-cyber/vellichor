@@ -285,13 +285,13 @@ pub fn get_active_peers() -> Vec<PeerPresence> {
     Vec::new()
 }
 
-fn broadcast_peers_update() {
+fn broadcast_peers_update(exclude: Option<&str>) {
     let peers = get_active_peers();
     let msg_json = serde_json::json!({
         "type": "peers-update",
         "peers": peers
     });
-    broadcast_ws_message(tungstenite::Message::Text(msg_json.to_string().into()), None);
+    broadcast_ws_message(tungstenite::Message::Text(msg_json.to_string().into()), exclude);
 }
 
 // Starts the decentralized peer node TCP/HTTP/WebSocket signaling server on every running Vellichor device
@@ -534,7 +534,8 @@ fn handle_websocket_connection(stream: TcpStream, app_handle: Arc<AppHandle>) {
                                     registered_device_id = Some(peer.device_id.clone());
                                     set_client_device_id(&client_id, &peer.device_id);
                                     upsert_active_peer(peer.clone());
-                                    broadcast_peers_update();
+                                    // Exclude self from echo
+                                    broadcast_peers_update(Some(&client_id));
 
                                     let _ = app_handle.emit("peer-presence-update", &peer);
                                 }
@@ -611,7 +612,7 @@ fn handle_websocket_connection(stream: TcpStream, app_handle: Arc<AppHandle>) {
     unregister_ws_client(&client_id);
     if let Some(ref dev_id) = registered_device_id {
         remove_active_peer(dev_id);
-        broadcast_peers_update();
+        broadcast_peers_update(None);
     }
 }
 

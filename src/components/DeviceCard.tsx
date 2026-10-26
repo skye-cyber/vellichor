@@ -65,7 +65,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 
   const Icon = getDeviceIcon();
   const statusInfo = getStatusBadge();
-
+//   console.log(isConnected, device)
   return (
     <div
       className={`p-4 sm:p-2 md:p-4 rounded-2xl border transition-all duration-200 bg-white dark:bg-vellichor-card ${
@@ -76,7 +76,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
     >
       <div className="flex items-start justify-between">
         {/* Left: Device Icon & Info */}
-        <div className="flex items-center xl:space-x-3">
+        <div className="flex items-center space-x-1.5 xl:space-x-3">
           <div
             className={`size-12 sm:size-10 md:size-12 rounded-xl flex items-center justify-center ${
               isConnected
@@ -95,7 +95,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-secondary fill-secondary/20" />
               )}
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-0 md:space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               <span className="font-mono">{device.ip}</span>
               <span>•</span>
               <span className="capitalize">{device.platform}</span>
