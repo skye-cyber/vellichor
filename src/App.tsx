@@ -116,6 +116,7 @@ export const App: React.FC = () => {
                             onRefreshScan={startScan}
                             onConnectDevice={connectToDevice}
                             onNavigateToTab={(tab) => setCurrentTab(tab)}
+                            onDisconnectDevice={disconnectDevice}
                         />
                     )}
 
