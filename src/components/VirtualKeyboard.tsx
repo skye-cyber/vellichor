@@ -133,7 +133,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                 ? 'Default Android keyboard is DISABLED. Click to allow native keyboard.'
                 : 'Default Android keyboard is ACTIVE. Click to prevent native keyboard popup.'
             }
-            className={`px-3 py-1 rounded-xl font-bold transition-all flex items-center space-x-1.5 ${
+            className={`px-3 py-1 rounded-xl font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
               suppressNativeKeyboard
                 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
                 : 'bg-secondary/15 text-secondary border border-secondary/30'
@@ -212,7 +212,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
             className={`px-3 py-1.5 rounded-xl font-bold uppercase transition-colors ${
               ctrlActive
                 ? 'bg-primary text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400'
+                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400 hover:text-primary'
             }`}
           >
             Ctrl
@@ -222,7 +222,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
             className={`px-3 py-1.5 rounded-xl font-bold uppercase transition-colors ${
               altActive
                 ? 'bg-primary text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400'
+                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400 hover:text-primary'
             }`}
           >
             Alt
@@ -232,7 +232,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
             className={`px-3 py-1.5 rounded-xl font-bold uppercase transition-colors ${
               shiftActive
                 ? 'bg-primary text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400'
+                : 'bg-gray-100 dark:bg-vellichor-surface text-gray-600 dark:text-gray-400 hover:text-primary'
             }`}
           >
             Shift

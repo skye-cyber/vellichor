@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all cursor-pointer ${
                 isActive
                   ? 'bg-primary text-white shadow-glow'
                   : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-vellichor-card hover:text-gray-900 dark:hover:text-white'

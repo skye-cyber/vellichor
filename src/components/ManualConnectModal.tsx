@@ -51,7 +51,7 @@ export const ManualConnectModal: React.FC<ManualConnectModalProps> = ({
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-vellichor-card text-gray-400 hover:text-gray-700 dark:hover:text-white"
+                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-vellichor-card text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -104,13 +104,13 @@ export const ManualConnectModal: React.FC<ManualConnectModalProps> = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-vellichor-card transition-colors"
+                            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-vellichor-card transition-colors cursor-pointer"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary-hover text-white shadow-balanced flex items-center space-x-2 transition-all"
+                            className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-primary hover:bg-primary-hover text-white shadow-balanced flex items-center space-x-2 transition-all cursor-pointer"
                         >
                             <span>Connect</span>
                             <ArrowRight className="w-4 h-4" />

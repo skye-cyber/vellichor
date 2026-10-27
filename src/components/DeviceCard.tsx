@@ -95,7 +95,7 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
                             )}
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            <span className="font-mono">{device.ip}</span>
+                            <span className="font-mono select-text">{device.ip}</span>
                             <span>•</span>
                             <span className="capitalize">{device.platform}</span>
                         </div>

@@ -64,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <button
                                 onClick={onDisconnect}
                                 title="Disconnect"
-                                className="p-1 hover:bg-secondary/20 rounded-full transition-colors text-gray-500 hover:text-red-500"
+                                className="p-1 hover:bg-secondary/20 rounded-full transition-colors text-gray-500 hover:text-red-500 cursor-pointer"
                             >
                                 <Unplug className="w-3.5 h-3.5" />
                             </button>
@@ -89,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                     onClick={() => setIsMobileLayout(!isMobileLayout)}
                     title={isMobileLayout ? 'Switch to Desktop Layout' : 'Preview Mobile Layout'}
-                    className={`p-2 rounded-lg border transition-colors ${isMobileLayout
+                    className={`p-2 rounded-lg border transition-colors cursor-pointer ${isMobileLayout
                         ? 'hidden sm:block bg-primary/10 border-primary text-primary'
                         : 'bg-gray-100 dark:bg-vellichor-card border-gray-200 dark:border-vellichor-border text-gray-600 dark:text-gray-300 hover:border-primary/50'
                         }`}
@@ -105,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                     onClick={toggleTheme}
                     title="Toggle Light/Dark Theme"
-                    className="p-2 rounded-lg bg-gray-100 dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border text-gray-600 dark:text-gray-300 hover:text-primary transition-colors"
+                    className="p-2 rounded-lg bg-gray-100 dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border text-gray-600 dark:text-gray-300 hover:text-primary transition-colors cursor-pointer"
                 >
                     {theme === 'dark' ? (
                         <Sun className="w-4 h-4 text-amber-400" />

@@ -67,7 +67,7 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
         <div className="flex p-1 rounded-2xl bg-gray-100 dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border self-start sm:self-auto shrink-0">
           <button
             onClick={() => setActiveTab('watch')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
               activeTab === 'watch'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-primary'
@@ -87,7 +87,7 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
                 ? 'Partner is broadcasting. Only one device can broadcast at a time.'
                 : undefined
             }
-            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
               activeTab === 'broadcast'
                 ? 'bg-primary text-white shadow-sm'
                 : partnerState.isBroadcasting
@@ -120,7 +120,7 @@ export const ScreenShareScreen: React.FC<ScreenShareScreenProps> = ({
           </div>
           <button
             onClick={onNavigateToDiscovery}
-            className="font-bold underline hover:text-amber-700"
+            className="font-bold underline hover:text-amber-700 cursor-pointer"
           >
             Find Peers
           </button>

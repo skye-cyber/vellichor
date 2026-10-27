@@ -37,7 +37,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <button
             key={item.id}
             onClick={() => setCurrentTab(item.id)}
-            className={`flex flex-col items-center justify-center flex-1 py-1 relative transition-colors ${
+            className={`flex flex-col items-center justify-center flex-1 py-1 relative transition-colors cursor-pointer ${
               isActive
                 ? 'text-primary font-semibold'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'

@@ -165,9 +165,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 <button
                     onClick={() => onNavigate('discovery')}
-                    className="px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center space-x-1.5 transition-colors"
+                    className="px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
                 >
-                    <span>Scan<span className='hidden sm:flex'> Network</span></span>
+                    <span>Scan</span><span className='hidden sm:flex'>Network</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                 </button>
             </div>
@@ -210,7 +210,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-vellichor-border flex items-center justify-between text-xs font-semibold text-primary">
+                                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-vellichor-border flex items-center justify-between text-xs font-semibold text-primary cursor-pointer">
                                     <span>Open Module</span>
                                     <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                                 </div>
@@ -228,7 +228,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </h2>
                     <button
                         onClick={() => onNavigate('discovery')}
-                        className="text-xs font-semibold text-primary hover:underline"
+                        className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                     >
                         View All
                     </button>
@@ -256,7 +256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                             <button
                                 onClick={() => onConnectDevice(device)}
-                                className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shrink-0 ml-2 shadow-sm transition-all"
+                                className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shrink-0 ml-2 shadow-sm transition-all cursor-pointer"
                             >
                                 {connectedDevice?.id === device.id ? 'Connected' : 'Connect'}
                             </button>

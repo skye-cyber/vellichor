@@ -53,7 +53,7 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
         <div className="flex p-1 rounded-2xl bg-gray-100 dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border self-start sm:self-auto shrink-0">
           <button
             onClick={() => setControlMode('touchpad')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
               controlMode === 'touchpad'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-primary'
@@ -64,7 +64,7 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
           </button>
           <button
             onClick={() => setControlMode('keyboard')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
               controlMode === 'keyboard'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-primary'
@@ -75,7 +75,7 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
           </button>
           <button
             onClick={() => setControlMode('media')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer ${
               controlMode === 'media'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-gray-600 dark:text-gray-300 hover:text-primary'
@@ -97,7 +97,7 @@ export const ControlScreen: React.FC<ControlScreenProps> = ({
           </div>
           <button
             onClick={onNavigateToDiscovery}
-            className="font-bold underline hover:text-amber-700"
+            className="font-bold underline hover:text-amber-700 cursor-pointer"
           >
             Find Peers
           </button>
