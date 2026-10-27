@@ -140,7 +140,7 @@ export class TauriNativeService {
                     signalStrength: d.signal_strength || 80,
                     lastSeen: d.last_seen || 'just now',
                 }));
-                console.log("[SCAN] Dev: ", result)
+                // console.log("[SCAN] Dev: ", result)
                 return result
             } catch (e) {
                 console.warn('Native scan_network invocation failed:', e);

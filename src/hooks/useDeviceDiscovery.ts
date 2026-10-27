@@ -91,8 +91,8 @@ export const useDeviceDiscovery = () => {
 
             // Register local device profile for mutual pairing handshakes and presence
             if (sys) {
-                console.log('[ID] sys.device_id =', sys.device_id);
-                console.log('[ID] registerPresence deviceId =', SignalingService.myDeviceId);
+                // console.log('[ID] sys.device_id =', sys.device_id);
+                // console.log('[ID] registerPresence deviceId =', SignalingService.myDeviceId);
                 const devId = sys.device_id || `device-${sys.hostname.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
                 const myDev: Device = {
                     id: devId,
@@ -150,8 +150,6 @@ export const useDeviceDiscovery = () => {
         // Listen to pairing responses from target device
         const unsubPairResp = WebRTCService.onPairingResponse((resp) => {
             if (resp.type === 'accept') {
-                console.log("TG:", resp)
-
                 setOutgoingPairing((prev) => {
                     if (!prev) return null;
                     const target = prev.device;
@@ -183,7 +181,6 @@ export const useDeviceDiscovery = () => {
 
         // Listen to mutual two-way pairing events from WebRTC data channel handshake
         const unsubPaired = WebRTCService.onPeerPaired(async (peerDevice) => {
-            console.log("Unpair:", peerDevice)
             setConnectedDevice(peerDevice);
             await SettingsService.addConnectionHistory({
                 deviceName: peerDevice.name,
@@ -252,10 +249,8 @@ export const useDeviceDiscovery = () => {
 
         if (!incomingPairingRequest) return;
         const { fromDevice, pin } = incomingPairingRequest;
-        console.log("[INC] From:", incomingPairingRequest)
         WebRTCService.sendPairAccept(fromDevice.id, pin);
         await WebRTCService.connectToPeer(fromDevice.id);
-        console.log("Accept:", fromDevice)
         setConnectedDevice(fromDevice);
 
         await SettingsService.addConnectionHistory({

@@ -5,33 +5,10 @@ use std::fs;
 use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
+use crate::paths;
+use crate::device_id::get_or_create_device_id;
 
-// Retrieves or generates a persistent unique hardware/device identifier stored on disk
-pub fn get_or_create_device_id() -> String {
-    let config_dir = std::env::var("HOME")
-        .map(|h| format!("{}/.config/vellichor", h))
-        .unwrap_or_else(|_| ".".to_string());
-    let _ = fs::create_dir_all(&config_dir);
-    let id_file = format!("{}/device_id", config_dir);
-
-    if let Ok(id) = fs::read_to_string(&id_file) {
-        let trimmed = id.trim().to_string();
-        if !trimmed.is_empty() {
-            return trimmed;
-        }
-    }
-
-    let new_id = format!(
-        "device_{}",
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
-            .unwrap_or(12345)
-    );
-    let _ = fs::write(&id_file, &new_id);
-    new_id
-}
 
 static DISCOVERY_STARTED: AtomicBool = AtomicBool::new(false);
 

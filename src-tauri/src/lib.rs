@@ -7,6 +7,8 @@ pub mod node_server;
 pub mod settings;
 pub mod system;
 pub mod types;
+pub mod paths;
+pub mod device_id;
 
 // Re-exports for clean library access
 pub use cache::*;
@@ -17,8 +19,11 @@ pub use node_server::*;
 pub use settings::*;
 pub use system::*;
 pub use types::*;
+// pub mod device_id::*;
 
 // App imports
+use std::collections::HashMap;
+use std::sync::Mutex;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 // Cross-platform imports — used on desktop, Android, and iOS
@@ -269,7 +274,10 @@ fn build_app() -> tauri::Builder<tauri::Wry> {
         .max_file_size(5 * 1024 * 1024)  // 5 MB per file
         .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepAll)
         .build(),
-    );
+    )
+    .plugin(tauri_plugin_fs::init());
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_android_fs::init());
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
     builder
@@ -285,6 +293,7 @@ pub fn run() {
         .manage(IconState {
             path: std::sync::Mutex::new(PathBuf::new()),
         })
+        .manage(files::DownloadRegistry::new())
         // Tauri IPC command handlers registration
         .invoke_handler(tauri::generate_handler![
             get_dev_status,
@@ -302,7 +311,7 @@ pub fn run() {
             settings::get_stored_settings,
             settings::save_stored_settings,
             // Native file transfer and chunked filesystem commands
-            files::get_download_directory,
+            paths::get_download_directory,
             files::write_file_chunk,
             files::read_file_chunk,
             files::get_file_info,
@@ -315,6 +324,13 @@ pub fn run() {
 
             // Start embedded P2P peer node server on port 42426
             node_server::start_node_server(handle.clone());
+
+            if let Err(e) = paths::ensure_data_files(&handle) {
+                // eprintln!("failed to prepare data directory: {e}");
+                log::error!("Failed to prepare data files: {}", e)
+            }
+
+            let _ = device_id::set_device_id_dir(paths::deviceid_dir(&handle));
 
             /* Desktop-only setup. Everything below touches APIs that are
              * `#[cfg(desktop)]`-gated inside Tauri itself (tray, window icons, global shortcuts, menu).

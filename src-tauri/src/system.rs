@@ -70,10 +70,20 @@ pub fn get_system_info() -> SystemInfo {
     let local_ips = get_all_local_ips();
 
     // Query or generate persistent unique hardware/device identifier
-    let device_id = crate::discovery::get_or_create_device_id();
+    let device_id = crate::device_id::get_or_create_device_id();
 
     SystemInfo {
-        hostname,
+        hostname: if hostname == "Vellichor-Device" {
+            // OS returned the placeholder hostname (common on Android). Derive a
+            // more useful name by stripping "device_" from it if present, otherwise
+            // fall back to the device id so two placeholders don't look identical.
+            hostname
+            .strip_prefix("device_")
+            .map(str::to_owned)
+            .unwrap_or_else(|| device_id.clone())
+        } else {
+            hostname
+        },
         platform,
         arch,
         device_type,
