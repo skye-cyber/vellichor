@@ -24,6 +24,11 @@ log = "0.4"
 tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png", "devtools"] }
 tauri-plugin-log = "2"
 tungstenite = "0.30.0"
+dirs="5"
+tauri-plugin-fs = "2"
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-android-fs = "=29.0.0"
+
 # Global shortcut is desktop-only — this prevents Android/iOS build failures
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-single-instance = "2"
