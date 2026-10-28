@@ -4,6 +4,7 @@ import { TauriNativeService } from '../services/TauriNativeService';
 import { SignalingService } from '../services/SignalingService';
 import { WebRTCService } from '../services/WebRTCService';
 import { SettingsService } from '../services/SettingsService';
+import { PLATFORM, setPlatform } from '../utils/system';
 
 export interface OutgoingPairingState {
     device: Device;
@@ -91,6 +92,7 @@ export const useDeviceDiscovery = () => {
 
             // Register local device profile for mutual pairing handshakes and presence
             if (sys) {
+                setPlatform(sys.platform as any)
                 // console.log('[ID] sys.device_id =', sys.device_id);
                 // console.log('[ID] registerPresence deviceId =', SignalingService.myDeviceId);
                 const devId = sys.device_id || `device-${sys.hostname.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;

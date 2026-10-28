@@ -192,10 +192,10 @@ pub fn write_file_chunk(
             log::error!("[WRITE_CHUNK] write failed id={} index={}: {}", download_id, index, e);
             e.to_string()
         })?;
-        file.sync_all().map_err(|e| {
-            log::error!("[WRITE_CHUNK] sync failed id={} index={}: {}", download_id, index, e);
-            e.to_string()
-        })?;
+        // file.sync_all().map_err(|e| {
+        //     log::error!("[WRITE_CHUNK] sync failed id={} index={}: {}", download_id, index, e);
+        //     e.to_string()
+        // })?;
     }
 
     #[cfg(not(target_os = "android"))]
@@ -249,10 +249,17 @@ pub fn finalize_download(
     let actual_len: u64 = {
         #[cfg(target_os = "android")]
         {
+            // Re-open for reading; fsync is safe on a read-only handle.
+            if let Ok(f) = app.android_fs().open_file_readable(&entry.handle) {
+                let _ = f.sync_all();
+            }
             app.android_fs().get_len(&entry.handle).map_err(|e| e.to_string())?
         }
         #[cfg(not(target_os = "android"))]
         {
+            // if let Ok(f) = std::fs::File::open(&entry.handle) {
+            //     let _ = f.sync_all();
+            // }
             std::fs::metadata(&entry.handle)
             .map_err(|e| e.to_string())?
             .len()

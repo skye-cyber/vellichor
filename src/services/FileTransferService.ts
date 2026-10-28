@@ -3,12 +3,12 @@ import { WebRTCService, encodeChunk, decodeChunk, base64ToArrayBuffer, CHUNK_HEA
 import { TauriNativeService } from './TauriNativeService';
 import { SettingsService } from './SettingsService';
 
-const CHUNK_SIZE = 768 * 1024;          // 768 KiB
+const CHUNK_SIZE = 256 * 1024;          // 768 KiB
 const WINDOW_SIZE = 1;                 // max in-flight unacked chunks
-const ACK_TIMEOUT_MS = 1000;
+const ACK_TIMEOUT_MS = 800;
 const READY_TIMEOUT_MS = 5000;
 const COMPLETE_TIMEOUT_MS = 30_000;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 25;
 
 type SendPhase = 'awaiting_ready' | 'streaming' | 'finalizing' | 'done';
 
@@ -85,6 +85,9 @@ export class FileTransferServiceClass {
         }
     }
 
+    async setPlatform(){
+
+    }
     // ---------------------------------------------------------------- picker
 
     async pickFiles(): Promise<TransferFile[]> {
@@ -116,7 +119,6 @@ export class FileTransferServiceClass {
 
     async sendFile(file: TransferFile, peerId: string, peerName?: string): Promise<Transfer> {
         if (!file.rawFile) throw new Error('cannot send: missing raw File handle');
-
         // → "tx-" + 8 chars = 11 chars, safe under the 16-byte header limit
         // padEnd(8, '0') handles the rare case where Math.random().toString(36).slice(2, 10) returns fewer than 8 chars (it can, for very small random values).
         // crypto.randomUUID().slice(0, 8) is another option if you want to avoid Math.random — not cryptographically necessary here, but fine.
@@ -194,10 +196,8 @@ export class FileTransferServiceClass {
             const start = index * CHUNK_SIZE;
             const end = Math.min(start + CHUNK_SIZE, file.size);
             const blob = file.slice(start, end);
-            console.log("[BLOB]", blob, "index=", index)
 
             const ab = await blob.arrayBuffer();
-            console.log("[AB]", ab, "index=", index)
             const frame = encodeChunk(transferId, index, new Uint8Array(ab));
 
             const ok = WebRTCService.sendData('file', frame);
@@ -206,7 +206,6 @@ export class FileTransferServiceClass {
                 return;
             }
             state.pending.add(index);
-            console.log(`[TX_SEND] id=${transferId} index=${index} bytes=${ab.byteLength + CHUNK_HEADER_BYTES} sent=${ok}`);
             return ok
         };
 
@@ -216,7 +215,6 @@ export class FileTransferServiceClass {
             state.ackedThrough + state.pending.size < totalChunks
         ) {
             const idx = state.ackedThrough + state.pending.size;
-            console.log(`[TX_SEND_IDX] idx=${idx}`)
             await sendChunk(idx);
         }
         this.armAckTimeout(transferId);
@@ -299,9 +297,6 @@ export class FileTransferServiceClass {
         }
 
         state.pending.add(index);
-        console.log(
-            `[TX_SEND_RAW] id=${transferId} index=${index} bytes=${payload.byteLength + CHUNK_HEADER_BYTES} sent=${ok}`,
-        );
         return ok;
     }
 
@@ -330,7 +325,6 @@ export class FileTransferServiceClass {
 
     private async handleControl(data: any) {
         if (!data || typeof data !== 'object' || !data.type) return;
-        console.log("Processing Control", data.type)
         switch (data.type) {
             case 'file_metadata':
                 return this.onMetadata(data);
@@ -356,7 +350,7 @@ export class FileTransferServiceClass {
         const transferId: string = data.transferId;
         let displayPath = data.name as string;
         let targetPathForFs = data.name as string; // Android: "Vellichor/<name>"
-        console.log(`[META] id=${data.transferId} name=${data.name} size=${data.size}`);
+
         if (TauriNativeService.isTauri()) {
             // Android receives relative path under Download; desktop receives
             // absolute path. Backend's begin_download picks the correct base.
@@ -440,7 +434,6 @@ export class FileTransferServiceClass {
     }
 
     private async onChunkAck(data: any) {
-        console.log(`[TX_ACK] id=${data.transferId} index=${data.index}`);
         const transferId: string = data.transferId;
         const index: number = data.index;
         const state = this.sendStates.get(transferId);
@@ -574,20 +567,13 @@ export class FileTransferServiceClass {
     private async persistChunk(transferId: string, index: number, payload: Uint8Array) {
         const transfer = this.transfers.get(transferId);
         const inc = this.incoming.get(transferId);
-        console.log(`[RX_CHUNK] id="${transferId}" index=${index} bytes=${payload.byteLength} ` +
-            `hasTransfer=${!!transfer} hasIncoming=${!!inc} ` +
-            `incomingKeys=${JSON.stringify(Array.from(this.incoming.keys()))} ` +
-            `transfersKeys=${JSON.stringify(Array.from(this.transfers.keys()))}`);
 
         if (!transfer || !inc) return;
-        console.log("PASS CHECK")
         try {
             if (TauriNativeService.isTauri()) {
-                console.log("Write to file")
                 const res = await TauriNativeService.writeFileChunk(transferId, index, payload);
                 // bytesWritten is authoritative from Rust; use it for speed
                 inc.bytesWritten = res.bytesWritten;
-                console.log(`[RX_CHUNK_OK] id=${transferId} index=${index} status=${res.status}`);
             } else {
                 const chunks = this.browserBuffers.get(transferId)!;
                 chunks[index] = payload; // index-based, so retransmits overwrite
@@ -599,7 +585,6 @@ export class FileTransferServiceClass {
             const ok = WebRTCService.sendData('file-ctl', {
                 type: 'file_chunk_ack', transferId, index,
             });
-            console.log(`[RX_ACK] id=${transferId} index=${index} sent=${ok}`);
 
             // Progress + speed
             inc.nextExpectedIndex = Math.max(inc.nextExpectedIndex, index + 1);

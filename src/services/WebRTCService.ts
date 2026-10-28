@@ -228,7 +228,6 @@ class WebRTCServiceClass {
         };
 
         channel.onopen = () => {
-            console.log(`DataChannel [${channel.label}] open`);
             if (channel.label === 'control' && this.myDevice) {
                 this.sendData('control', {
                     type: 'PAIR_HANDSHAKE',
@@ -239,7 +238,6 @@ class WebRTCServiceClass {
         };
 
         channel.onclose = () => {
-            console.log(`DataChannel [${channel.label}] closed`);
             this.dataChannels.delete(channel.label);
         };
     }
@@ -375,7 +373,6 @@ class WebRTCServiceClass {
         const channelName: string | undefined = signal?.directChannel;
 
         if (channelName && this.channelListeners.has(channelName)) {
-            console.log(`Signal: ${JSON.stringify(signal)}`)
             this.dispatchIncoming(channelName, signal.data ?? signal.payload ?? signal);
             return;
         }

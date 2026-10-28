@@ -51,7 +51,6 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                 const isCompleted = item.status === 'completed';
                 const isFailed = item.status === 'failed';
                 const isPaused = item.status === 'paused';
-                const etaText = formatEta(item.etaSeconds);
 
                 return (
                     <div
@@ -61,15 +60,15 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 truncate">
                                 <div
-                                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isSending
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'bg-secondary/10 text-secondary'
+                                    className={`size-8 sm:size-10 rounded-xl flex items-center justify-center shrink-0 ${isSending
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'bg-secondary/10 text-secondary'
                                         }`}
                                 >
                                     {isSending ? (
-                                        <ArrowUpRight className="w-5 h-5" />
+                                        <ArrowUpRight className="size-4 sm:size-5" />
                                     ) : (
-                                        <ArrowDownLeft className="w-5 h-5" />
+                                        <ArrowDownLeft className="size-4 sm:size-5" />
                                     )}
                                 </div>
                                 <div className="truncate">
@@ -106,17 +105,15 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                                     <>
                                         <div className="text-right">
                                             <div className="text-xs font-mono font-bold text-primary">
-                                                {formatSpeed(item.speedMb)} · {formatEta(item.etaSeconds as number)} left
+                                                {formatSpeed(item.speedMb)}
                                             </div>
                                             <span className="text-xs text-muted">
                                                 {formatSize(item.file.size * item.progress / 100)} / {formatSize(item.file.size)}
                                             </span>
-                                            {etaText && (
-                                                <div className="text-[10px] text-gray-400 font-mono flex items-center justify-end space-x-1">
-                                                    <Clock className="w-2.5 h-2.5" />
-                                                    <span>{etaText}</span>
-                                                </div>
-                                            )}
+                                            <div className="text-[10px] text-gray-400 font-mono flex items-center justify-end space-x-1">
+                                                <Clock className="w-2.5 h-2.5" />
+                                                <span>{formatEta(item.etaSeconds as number)}</span>
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => FileTransferService.togglePause(item.id)}
@@ -148,10 +145,10 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                             <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-vellichor-surface overflow-hidden">
                                 <div
                                     className={`h-full transition-all duration-300 ${isCompleted
-                                            ? 'bg-secondary'
-                                            : isFailed
-                                                ? 'bg-red-500'
-                                                : 'bg-primary'
+                                        ? 'bg-secondary'
+                                        : isFailed
+                                            ? 'bg-red-500'
+                                            : 'bg-primary'
                                         }`}
                                     style={{ width: `${item.progress}%` }}
                                 />
