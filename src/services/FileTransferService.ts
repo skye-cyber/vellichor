@@ -23,6 +23,7 @@ interface SendState {
 }
 
 interface IncomingState {
+    startedAt: number;
     bytesWritten: number;
     nextExpectedIndex: number;
     lastProgressAt: number;
@@ -36,6 +37,7 @@ export class FileTransferServiceClass {
     private incoming = new Map<string, IncomingState>();
     private browserBuffers = new Map<string, Uint8Array[]>(); // non-Tauri fallback
     private activeDownloadDir = SettingsService.getSettings().downloadPath;
+    private timers = new Map<string, ReturnType<typeof setInterval>>();
 
     constructor() {
         WebRTCService.onData('file-ctl', (data) => this.handleControl(data));
@@ -385,12 +387,26 @@ export class FileTransferServiceClass {
             currentChunk: 0,
             savedPath: TauriNativeService.isTauri() ? displayPath : undefined,
         };
+        const tick = setInterval(() => {
+            const inc = this.incoming.get(transferId);
+            const t = this.transfers.get(transferId);
+            if (!inc || !t) { clearInterval(tick); return; }
+            const elapsed = (Date.now() - inc.startedAt) / 1000;
+            if (elapsed > 0.5) {
+                t.speedMb = +((inc.bytesWritten / (1024 * 1024)) / elapsed).toFixed(2);
+                const remaining = t.file.size - inc.bytesWritten;
+                t.etaSeconds = t.speedMb > 0 ? Math.round(remaining / (t.speedMb * 1024 * 1024)) : 0;
+                this.notify();
+            }
+        }, 500);
+        this.timers.set(transferId, tick);
         this.transfers.set(transferId, transfer);
         this.incoming.set(transferId, {
             bytesWritten: 0,
             nextExpectedIndex: 0,
             lastProgressAt: Date.now(),
             bytesSinceLastReport: 0,
+            startedAt: Date.now(),
         });
         if (!TauriNativeService.isTauri()) this.browserBuffers.set(transferId, []);
         this.notify();
@@ -484,6 +500,7 @@ export class FileTransferServiceClass {
             }
             // this.incoming.delete(transferId);
             this.browserBuffers.delete(transferId);
+            this.stopTimer(transferId)
         } catch (e) {
             WebRTCService.sendData('file-ctl', {
                 type: 'file_error', transferId, reason: `finalize: ${e}`,
@@ -493,6 +510,11 @@ export class FileTransferServiceClass {
                 await TauriNativeService.cleanupDownload(transferId, true).catch(() => { });
             }
         }
+    }
+    // clear in a single cleanup helper called from all terminal paths:
+    private stopTimer(transferId: string) {
+        const t = this.timers.get(transferId);
+        if (t) { clearInterval(t); this.timers.delete(transferId); }
     }
 
     private async onCompleteAck(data: any) {
@@ -524,11 +546,13 @@ export class FileTransferServiceClass {
                 await TauriNativeService.cleanupDownload(transferId, true).catch(() => { });
             }
         }
+        this.stopTimer(transferId)
         this.notify();
     }
 
     private async onRemoteError(data: any) {
         const transferId: string = data.transferId;
+        this.stopTimer(transferId)
         this.fail(transferId, `remote: ${data.reason ?? 'unknown error'}`);
     }
 
@@ -551,9 +575,9 @@ export class FileTransferServiceClass {
         const transfer = this.transfers.get(transferId);
         const inc = this.incoming.get(transferId);
         console.log(`[RX_CHUNK] id="${transferId}" index=${index} bytes=${payload.byteLength} ` +
-        `hasTransfer=${!!transfer} hasIncoming=${!!inc} ` +
-        `incomingKeys=${JSON.stringify(Array.from(this.incoming.keys()))} ` +
-        `transfersKeys=${JSON.stringify(Array.from(this.transfers.keys()))}`);
+            `hasTransfer=${!!transfer} hasIncoming=${!!inc} ` +
+            `incomingKeys=${JSON.stringify(Array.from(this.incoming.keys()))} ` +
+            `transfersKeys=${JSON.stringify(Array.from(this.transfers.keys()))}`);
 
         if (!transfer || !inc) return;
         console.log("PASS CHECK")
@@ -630,6 +654,7 @@ export class FileTransferServiceClass {
         this.sendStates.delete(transferId);
         // this.incoming.delete(transferId);
         this.browserBuffers.delete(transferId);
+        this.stopTimer(transferId)
         this.notify();
 
         if (wasActive) {
@@ -650,6 +675,7 @@ export class FileTransferServiceClass {
         t.status = 'failed';
         t.error = reason;
         this.sendStates.delete(transferId);
+        this.stopTimer(transferId)
         this.notify();
         // Do not send file_error here if we already did; callers decide.
     }

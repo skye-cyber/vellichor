@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { TransferFile, Device } from '../types';
 import { FileTransferService } from '../services/FileTransferService';
+import { formatBytes } from '../utils/formats';
 
 interface FileBrowserProps {
   connectedDevice: Device | null;
@@ -28,14 +29,6 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   const [localFiles, setLocalFiles] = useState<TransferFile[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDragging, setIsDragging] = useState(false);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
 
   const getFileIcon = (name: string, _type: string) => {
     const ext = name.split('.').pop()?.toLowerCase();
