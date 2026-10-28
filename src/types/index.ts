@@ -97,7 +97,7 @@ export interface Transfer {
   progress: number;
   speedMb: number;
   etaSeconds?: number;
-  status: 'pending' | 'transferring' | 'completed' | 'failed' | 'paused';
+  status: 'pending' | 'waiting_ready' | 'transferring' | 'paused' | 'finalizing' | 'completed' | 'cancelled' | 'failed';
   direction: 'send' | 'receive';
   peerId?: string;
   peerName?: string;

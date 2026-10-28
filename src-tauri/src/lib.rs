@@ -312,9 +312,12 @@ pub fn run() {
             settings::save_stored_settings,
             // Native file transfer and chunked filesystem commands
             paths::get_download_directory,
-            files::write_file_chunk,
             files::read_file_chunk,
             files::get_file_info,
+            files::begin_download,
+            files::write_file_chunk,
+            files::finalize_download,
+            files::cleanup_download,
             // Decentralized P2P node server signaling commands
             node_server::send_peer_signal,
             node_server::get_node_status

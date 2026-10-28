@@ -2,6 +2,11 @@ import { SignalingService } from './SignalingService';
 import { TauriNativeService } from './TauriNativeService';
 import { Device } from '../types';
 
+// Binary chunks use a fixed 20-byte header so the receiver can route
+// them without a correlated control frame. Cheap, and removes any
+// ordering assumption between the ctl and payload channels.
+export const CHUNK_HEADER_BYTES = 32; // 32-byte id + 4-byte index = 36
+
 // Detects whether the current runtime environment supports native WebRTC API
 export const isWebRTCSupported = (): boolean => {
     return (
@@ -51,6 +56,9 @@ export interface PairingResponseEvent {
 export type PairingRequestListener = (event: PairingRequestEvent) => void;
 export type PairingResponseListener = (event: PairingResponseEvent) => void;
 
+// Add a per-channel listener type (same shape, but registered for one channel):
+export type ChannelDataListener = (data: any) => void;
+
 class WebRTCServiceClass {
     private peerConnection: any = null;
     private dataChannels: Map<string, any> = new Map();
@@ -84,6 +92,9 @@ class WebRTCServiceClass {
     public connectionState: any = 'new';
     public allowRemoteControl: boolean = true;
     private stateChangeListeners: Set<(state: any) => void> = new Set();
+    // Internal registry: one Set per channel name. The wildcard key '' receives
+    // every message, so existing `onData(cb)` callers keep working unchanged.
+    public channelListeners = new Map<string, Set<ChannelDataListener>>();
 
     private readonly iceServers: any[] = [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -197,7 +208,12 @@ class WebRTCServiceClass {
 
         channel.onmessage = (event: any) => {
             if (event.data instanceof ArrayBuffer) {
+                // legacy wildcard listeners (unchanged signature)
                 this.dataListeners.forEach((cb) => cb(channel.label, event.data));
+
+                // per-channel listeners
+                this.channelListeners.get(channel.label)?.forEach((cb) => cb(event.data));
+                this.channelListeners.get('')?.forEach((cb) => cb(event.data)); // optional wildcard
                 return;
             }
 
@@ -343,11 +359,26 @@ class WebRTCServiceClass {
             }
         }
     }
-
+    private dispatchIncoming(channelName: string, data: any) {
+        this.dataListeners.forEach((cb) => cb(channelName, data));
+        this.channelListeners.get(channelName)?.forEach((cb) => cb(data));
+    }
     // Processes incoming SDP offers, answers, ICE candidates, or direct transport frames
     private async handleIncomingSignal(payload: { from: string; fromDeviceId?: string; signal: any }) {
         const { from, signal } = payload;
         if (!signal) return;
+
+        // Route by explicit channel name first. Signals that carry a `channel`
+        // field (file-ctl, file, or any future named channel) go through the
+        // per-channel listeners and are NOT passed to the legacy directChannel
+        // handler, which would otherwise swallow them.
+        const channelName: string | undefined = signal?.directChannel;
+
+        if (channelName && this.channelListeners.has(channelName)) {
+            console.log(`Signal: ${JSON.stringify(signal)}`)
+            this.dispatchIncoming(channelName, signal.data ?? signal.payload ?? signal);
+            return;
+        }
 
         // Mutual pairing protocol handshake signals
         if (signal.type === 'PAIR_REQUEST') {
@@ -512,12 +543,31 @@ class WebRTCServiceClass {
     }
 
     // Emits payload through direct signaling channel to peer
-    private sendDirectChannelData(channelName: string, data: any) {
+    private _sendDirectChannelData_(channelName: string, data: any) {
         if (this.activePeerId) {
             SignalingService.sendSignal(this.activePeerId, {
                 directChannel: channelName,
                 data,
             });
+        }
+    }
+
+    private sendDirectChannelData(channelName: string, data: any) {
+        const isBinary = data instanceof ArrayBuffer || ArrayBuffer.isView(data);
+        let envelope;
+        if (isBinary) {
+            const bytes = data instanceof ArrayBuffer
+            ? new Uint8Array(data)
+            : new Uint8Array((data as ArrayBufferView).buffer);
+            envelope = {
+                directChannel: channelName,
+                data: { __binary: true, base64: bytesToBase64(bytes) },
+            };
+        } else {
+            envelope = { directChannel: channelName, data };
+        }
+        if (this.activePeerId) {
+            SignalingService.sendSignal(this.activePeerId, envelope);
         }
     }
 
@@ -925,11 +975,42 @@ class WebRTCServiceClass {
         };
     }
 
-    onData(callback: DataListener): () => void {
-        this.dataListeners.add(callback);
-        return () => {
-            this.dataListeners.delete(callback);
-        };
+    /**
+     * Subscribe to incoming data on a specific channel.
+     *
+     *   onData('file', cb)       -> cb(data) for `file` channel only
+     *   onData(cb)               -> cb(channel, data) for every channel (legacy)
+     *
+     * Both forms return an unsubscribe function.
+     */
+    onData(
+        channelOrCallback: string | DataListener,
+        maybeCallback?: ChannelDataListener,
+    ): () => void {
+        // Per-channel form: onData('file-ctl', (data) => ...)
+        if (typeof channelOrCallback === 'string') {
+            if (typeof maybeCallback !== 'function') {
+                throw new TypeError(
+                    `onData('${channelOrCallback}', cb): callback must be a function`,
+                );
+            }
+            const cb = maybeCallback;
+            let set = this.channelListeners.get(channelOrCallback);
+            if (!set) {
+                set = new Set();
+                this.channelListeners.set(channelOrCallback, set);
+            }
+            set.add(cb);
+            return () => {
+                set!.delete(cb);
+                if (set!.size === 0) this.channelListeners.delete(channelOrCallback);
+            };
+        }
+
+        // Legacy wildcard form: onData((channel, data) => ...)
+        const cb = channelOrCallback as DataListener;
+        this.dataListeners.add(cb);
+        return () => { this.dataListeners.delete(cb); };
     }
 
     onRemoteStream(callback: StreamListener): () => void {
@@ -1064,6 +1145,54 @@ class WebRTCServiceClass {
         this.connectionState = 'closed';
         this.stateChangeListeners.forEach((cb) => cb('closed'));
     }
+}
+
+export function encodeChunk(transferId: string, index: number, payload: Uint8Array): ArrayBuffer {
+    const idBytes = new TextEncoder().encode(transferId.padEnd(16, '\0').slice(0, 16));
+    const buf = new ArrayBuffer(CHUNK_HEADER_BYTES + payload.byteLength);
+    const view = new DataView(buf);
+    new Uint8Array(buf, 0, 16).set(idBytes);
+    view.setUint32(16, index, false);
+    new Uint8Array(buf, CHUNK_HEADER_BYTES).set(payload);
+    return buf;
+}
+
+export function decodeChunk(buf: ArrayBuffer): { transferId: string; index: number; payload: Uint8Array } {
+    const idBytes = new Uint8Array(buf, 0, 16);
+    // Trim trailing NULs from padEnd
+    let end = 16;
+    while (end > 0 && idBytes[end - 1] === 0) end--;
+    const transferId = new TextDecoder().decode(idBytes.subarray(0, end));
+    const index = new DataView(buf).getUint32(16, false);
+    const payload = new Uint8Array(buf, CHUNK_HEADER_BYTES);
+    return { transferId, index, payload };
+}
+
+export function bytesToBase64(bytes: Uint8Array): string {
+    // Chunked conversion: building the whole string at once via
+    // String.fromCharCode(...bytes) overflows the call stack for buffers
+    // larger than ~65k bytes. Process in 8 KiB windows.
+    const CHUNK = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+        const slice = bytes.subarray(i, i + CHUNK);
+        binary += String.fromCharCode.apply(
+            null,
+            slice as unknown as number[],
+        );
+    }
+    return btoa(binary);
+}
+
+export function base64ToArrayBuffer(b64: string): ArrayBuffer {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    // Return the exact slice — binary may be zero-length, in which case
+    // `bytes.buffer` is a zero-byte ArrayBuffer, which is still valid.
+    return bytes.buffer;
 }
 
 export const WebRTCService = new WebRTCServiceClass();

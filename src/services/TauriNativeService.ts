@@ -264,27 +264,52 @@ export class TauriNativeService {
         return 'Downloads';
     }
 
-    // Writes or appends a chunk of binary data to a destination file on disk
+    // Writes one chunk at a specific index. The backend rejects out-of-order
+    // writes and returns `status: "duplicate"` for retransmitted indexes.
     static async writeFileChunk(
-        filePath: string,
-        dataBytes: number[] | Uint8Array,
-        isInitialChunk: boolean
-    ): Promise<boolean> {
-        if (this.isTauri()) {
-            try {
-                const bytesArray = Array.from(dataBytes);
-                return await invoke<boolean>('write_file_chunk', {
-                    filePath,
-                    dataBytes: bytesArray,
-                    isInitialChunk,
-                });
-            } catch (e) {
-                console.warn('Native write_file_chunk error:', e);
-            }
+        downloadId: string,
+        index: number,
+        dataBytes: Uint8Array,
+    ): Promise<{ status: 'written' | 'duplicate'; bytesWritten: number; nextExpectedIndex: number }> {
+        if (!this.isTauri()) {
+            throw new Error('writeFileChunk requires Tauri runtime');
         }
-        return false;
+        return await invoke('write_file_chunk', {
+            downloadId,
+            index,
+            // Tauri IPC transports Vec<u8> best as number[]. Passing Uint8Array
+            // works on some versions but not all; Array.from is portable.
+            dataBytes: Array.from(dataBytes),
+        });
     }
 
+    // Creates the receiver-side registry entry and destination file.
+    // Must be called before the first chunk arrives. Idempotent.
+    static async beginDownload(
+        downloadId: string,
+        filePath: string,
+        totalSize: number,
+        mimeType?: string,
+    ): Promise<{ alreadyExisted: boolean; displayPath: string }> {
+        if (!this.isTauri()) {
+            return { alreadyExisted: false, displayPath: filePath };
+        }
+        return await invoke<{ alreadyExisted: boolean; displayPath: string }>('begin_download', {
+            downloadId,
+            filePath,
+            totalSize,
+            mimeType: mimeType ?? null,
+        });
+    }
+
+    // Verifies the file on disk matches the tracked byte count. Throws on
+    // mismatch. Returns the final file length on success.
+    static async finalizeDownload(downloadId: string): Promise<number> {
+        if (!this.isTauri()) {
+            throw new Error('finalizeDownload requires Tauri runtime');
+        }
+        return await invoke<number>('finalize_download', { downloadId });
+    }
     // Reads a chunk of binary data from a file on disk
     static async readFileChunk(
         filePath: string,
@@ -343,12 +368,12 @@ export class TauriNativeService {
     static async listenPeerSignal(callback: (payload: any) => void): Promise<(() => void) | null> {
         if (this.isTauri()) {
             try {
-                console.log('[TauriNativeService] Subscribing to native p2p-signal event...');
+                // console.log('[TauriNativeService] Subscribing to native p2p-signal event...');
                 const unlisten = await listen<any>('p2p-signal', (event) => {
-                    console.log('[TauriNativeService] Received p2p-signal event:', event.payload);
+                    // console.log('[TauriNativeService] Received p2p-signal event:', event.payload);
                     callback(event.payload);
                 });
-                console.log('[TauriNativeService] Successfully subscribed to p2p-signal event');
+                // console.log('[TauriNativeService] Successfully subscribed to p2p-signal event');
                 return unlisten;
             } catch (e) {
                 console.warn('Native listenPeerSignal error:', e);
@@ -369,6 +394,13 @@ export class TauriNativeService {
         return null;
     }
     static async getVersion(): Promise<string> {
-        return invoke<string>('get_app_version');
+        return await invoke<string>('get_app_version');
+    }
+    // Releases the registry entry. When `deletePartial` is true (cancel or
+    // failure), attempts to remove the partial file. When false (success),
+    // leaves the file in place.
+    static async cleanupDownload(downloadId: string, deletePartial: boolean): Promise<void> {
+        if (!this.isTauri()) return;
+        await invoke('cleanup_download', { downloadId, deletePartial });
     }
 }

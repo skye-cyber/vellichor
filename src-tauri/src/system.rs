@@ -67,7 +67,14 @@ pub fn get_system_info() -> SystemInfo {
     .to_string();
 
     // Collect all dynamic network interface IPv4 addresses
-    let local_ips = get_all_local_ips();
+    let mut local_ips = get_all_local_ips();
+
+    local_ips.sort_by_key(|ip| {
+        if ip.starts_with("192.168.") { 0 }
+        else if ip.starts_with("10.") { 1 }
+        else if ip.starts_with("100.") { 9 }   // Tailscale/CGNAT last
+        else { 5 }
+    });
 
     // Query or generate persistent unique hardware/device identifier
     let device_id = crate::device_id::get_or_create_device_id();

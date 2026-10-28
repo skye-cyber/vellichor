@@ -51,7 +51,7 @@ class SignalingServiceClass {
             try {
                 console.log('[SignalingService] Attaching native listenPeerSignal...');
                 const unlisten = await TauriNativeService.listenPeerSignal((payload) => {
-                    console.log('[SignalingService] Received native p2p-signal event:', payload);
+                    // console.log('[SignalingService] Received native p2p-signal event:', payload);
                     this.handleIncomingSignal(payload);
                 });
                 if (unlisten) {
@@ -138,7 +138,7 @@ class SignalingServiceClass {
         if (!deviceId || !ip) return;
         const cleanIp = ip.split(':')[0].trim();
         const finalPort = port || 42426;
-        console.log(`[SignalingService] Registering peer endpoint: ${deviceId} -> ${cleanIp}:${finalPort}`);
+        // console.log(`[SignalingService] Registering peer endpoint: ${deviceId} -> ${cleanIp}:${finalPort}`);
         this.peerEndpoints.set(deviceId, { ip: cleanIp, port: finalPort });
         this.peerEndpoints.set(cleanIp, { ip: cleanIp, port: finalPort });
     }
@@ -209,7 +209,7 @@ class SignalingServiceClass {
             };
 
             this.ws.onerror = (err) => {
-                console.warn('[SignalingService] WebSocket notice:', err);
+                console.warn('[SignalingService] WebSocket notice:', err.type);
             };
 
             this.ws.onclose = () => {
@@ -343,12 +343,6 @@ class SignalingServiceClass {
             });
         }
 
-        // console.log('[SignalingService] Dispatching signal to listeners:', {
-        //     type: sigType,
-        //     pin,
-        //     from: dev,
-        //     listenersCount: this.signalListeners.size,
-        // });
 
         this.signalListeners.forEach((cb) => cb(payload));
     }

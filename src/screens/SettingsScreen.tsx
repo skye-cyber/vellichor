@@ -352,6 +352,7 @@ export const SettingsScreen: React.FC = () => {
                         </div>
                         <input
                             type="text"
+                            disabled
                             value={settings.downloadPath}
                             onChange={(e) => updateSetting('downloadPath', e.target.value)}
                             className="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-vellichor-surface border border-gray-200 dark:border-vellichor-border font-mono text-xs text-gray-800 dark:text-white focus:outline-none focus:border-primary w-full sm:w-64"
