@@ -57,6 +57,8 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
     // A ref-based counter so the interval callback sees updates without
     // re-creating the interval on every state change.
     const lastCounterRef = useRef(-1);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const decodingRef = useRef(false);
 
     // -------------------------------------------------------------------
     // 1. Detect platform on mount
@@ -118,33 +120,75 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
     // 4. Frame poller — runs ONLY while broadcasting.
     //    Calls get_frame_meta, and when counter changes, updates previewSrc.
     // -------------------------------------------------------------------
-    useEffect(() => {
-        if (!isBroadcasting) return;
-        // Synthetic path uses <video>, not stream://, so no polling needed.
-        if (useSynthetic && !isAndroid) return;
+    //     useEffect(() => {
+    //         if (!isBroadcasting) return;
+    //         // Synthetic path uses <video>, not stream://, so no polling needed.
+    //         if (useSynthetic && !isAndroid) return;
+    //
+    //         console.log('[BDR] poller start, fps=', fps);
+    //         pollRef.current = setInterval(async () => {
+    //             try {
+    //                 const meta = await invoke<FrameMeta>('get_frame_meta');
+    //                 setMetaDebug(meta);
+    //                 if (meta.counter !== lastCounterRef.current && meta.active) {
+    //                     console.log('[BDR] frame update counter=', meta.counter, 'size=', meta.width, 'x', meta.height);
+    //                     lastCounterRef.current = meta.counter;
+    //                     setLastCounter(meta.counter);
+    //                     setPreviewSrc(`stream://localhost/frame.jpg?t=${meta.counter}`);
+    //                 }
+    //             } catch (e) {
+    //                 console.error('[BDR] get_frame_meta failed', e);
+    //             }
+    //         }, Math.max(16, Math.floor(1000 / fps)));
+    //
+    //         return () => {
+    //             console.log('[BDR] poller stop');
+    //             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    //         };
+    //     }, [isBroadcasting, fps, useSynthetic, isAndroid]);
 
-        console.log('[BDR] poller start, fps=', fps);
-        pollRef.current = setInterval(async () => {
+    // Poller effect — same polling, but instead of setPreviewSrc, fetch and draw.
+    useEffect(() => {
+        if (!isBroadcasting || useSynthetic) return;
+
+        const poll = async () => {
             try {
                 const meta = await invoke<FrameMeta>('get_frame_meta');
                 setMetaDebug(meta);
-                if (meta.counter !== lastCounterRef.current && meta.active) {
-                    console.log('[BDR] frame update counter=', meta.counter, 'size=', meta.width, 'x', meta.height);
-                    lastCounterRef.current = meta.counter;
-                    setLastCounter(meta.counter);
-                    setPreviewSrc(`stream://localhost/frame.jpg?t=${meta.counter}`);
-                }
-            } catch (e) {
-                console.error('[BDR] get_frame_meta failed', e);
-            }
-        }, Math.max(16, Math.floor(1000 / fps)));
+                if (meta.counter === lastCounterRef.current || !meta.active) return;
+                lastCounterRef.current = meta.counter;
 
+                // Drop frames if we're still decoding the previous one.
+//                 if (decodingRef.current) return;
+                decodingRef.current = true;
+
+                const url = `stream://localhost/frame.jpg?t=${meta.counter}`;
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = canvasRef.current;
+                    if (canvas) {
+                        if (canvas.width !== img.width || canvas.height !== img.height) {
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                        }
+                        const ctx = canvas.getContext('2d');
+                        ctx?.drawImage(img, 0, 0);
+                    }
+                    decodingRef.current = false;
+                };
+                setPreviewSrc(url)
+                img.onerror = () => {
+                    decodingRef.current = false;
+                };
+                img.src = url;
+            } catch { /* ignore */ }
+        };
+
+        pollRef.current = setInterval(poll, Math.max(16, Math.floor(1000 / fps)));
         return () => {
-            console.log('[BDR] poller stop');
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         };
     }, [isBroadcasting, fps, useSynthetic, isAndroid]);
-
 
     // Wrap accessors so the poller reads the latest value.
     // (Kept for clarity; the ref itself is what matters.)
@@ -251,7 +295,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
     return (
         <div className="flex-1 flex flex-col space-y-6">
-            {/* Debug overlay — visible on the device screen, no devtools needed */}
+            {/* Debug overlay — visible on the device screen */}
             {isBroadcasting && (
                 <div
                     style={{
@@ -373,12 +417,16 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
             {/* Preview */}
             <div className="flex-1 min-h-[320px] bg-black rounded-3xl overflow-hidden border border-gray-800 relative flex items-center justify-center shadow-xl">
-                <img
+                {/*<img
                     src={previewSrc}
                     alt=""
                     className={`w-full h-full object-contain ${isBroadcasting && previewSrc ? '' : 'hidden'}`}
                     onError={(e) => console.error('[BDR] <img> load error', e)}
                     onLoad={() => console.log('[BDR] <img> loaded', previewSrc)}
+                />*/}
+                <canvas
+                    ref={canvasRef}
+                    className={`w-full h-full object-contain ${isBroadcasting ? '' : 'hidden'}`}
                 />
                 {isBroadcasting ? (
                     <div className="absolute top-4 left-4 z-10 flex items-center space-x-3">
