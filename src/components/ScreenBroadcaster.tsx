@@ -5,6 +5,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { WebRTCService } from '../services/WebRTCService';
 import { TauriNativeService } from '../services/TauriNativeService';
+import { listen } from '@tauri-apps/api/event';
 
 interface MonitorInfo {
     id: string;
@@ -12,13 +13,6 @@ interface MonitorInfo {
     width: number;
     height: number;
     isPrimary: boolean;
-}
-
-interface FrameMeta {
-    counter: number;
-    width: number;
-    height: number;
-    active: boolean;
 }
 
 interface ScreenBroadcasterProps {
@@ -31,7 +25,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
     partnerBroadcasting,
 }) => {
     // ---- platform detection ----
-    const [platform, setPlatform] = useState<string | null>(null);
+    const [_platform, setPlatform] = useState<string | null>(null);
     const [isAndroid, setIsAndroid] = useState(false);
     const [platformChecked, setPlatformChecked] = useState(false);
 
@@ -47,19 +41,12 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
     const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
     const [selectedMonitor, setSelectedMonitor] = useState<string | null>(null);
 
-    // ---- preview ----
-    const [previewSrc, setPreviewSrc] = useState('');
-    const [lastCounter, setLastCounter] = useState(-1);
-    const [metaDebug, setMetaDebug] = useState<FrameMeta | null>(null);
-
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     // A ref-based counter so the interval callback sees updates without
     // re-creating the interval on every state change.
     const lastCounterRef = useRef(-1);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const decodingRef = useRef(false);
-
     // -------------------------------------------------------------------
     // 1. Detect platform on mount
     // -------------------------------------------------------------------
@@ -116,53 +103,31 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, [isBroadcasting]);
 
-    // -------------------------------------------------------------------
-    // 4. Frame poller — runs ONLY while broadcasting.
-    //    Calls get_frame_meta, and when counter changes, updates previewSrc.
-    // -------------------------------------------------------------------
-    //     useEffect(() => {
-    //         if (!isBroadcasting) return;
-    //         // Synthetic path uses <video>, not stream://, so no polling needed.
-    //         if (useSynthetic && !isAndroid) return;
-    //
-    //         console.log('[BDR] poller start, fps=', fps);
-    //         pollRef.current = setInterval(async () => {
-    //             try {
-    //                 const meta = await invoke<FrameMeta>('get_frame_meta');
-    //                 setMetaDebug(meta);
-    //                 if (meta.counter !== lastCounterRef.current && meta.active) {
-    //                     console.log('[BDR] frame update counter=', meta.counter, 'size=', meta.width, 'x', meta.height);
-    //                     lastCounterRef.current = meta.counter;
-    //                     setLastCounter(meta.counter);
-    //                     setPreviewSrc(`stream://localhost/frame.jpg?t=${meta.counter}`);
-    //                 }
-    //             } catch (e) {
-    //                 console.error('[BDR] get_frame_meta failed', e);
-    //             }
-    //         }, Math.max(16, Math.floor(1000 / fps)));
-    //
-    //         return () => {
-    //             console.log('[BDR] poller stop');
-    //             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    //         };
-    //     }, [isBroadcasting, fps, useSynthetic, isAndroid]);
-
-    // Poller effect — same polling, but instead of setPreviewSrc, fetch and draw.
     useEffect(() => {
-        if (!isBroadcasting || useSynthetic) return;
+        if (!isBroadcasting) return;
+        if (useSynthetic && !isAndroid) return;
 
-        const poll = async () => {
-            try {
-                const meta = await invoke<FrameMeta>('get_frame_meta');
-                setMetaDebug(meta);
-                if (meta.counter === lastCounterRef.current || !meta.active) return;
-                lastCounterRef.current = meta.counter;
+        let unlisten: (() => void) | undefined;
+        let cancelled = false;
 
-                // Drop frames if we're still decoding the previous one.
-//                 if (decodingRef.current) return;
+        const setup = async () => {
+            unlisten = await listen<{
+                counter: number; width: number; height: number; byteLength: number;
+            }>('frame-published', (event) => {
+                if (cancelled) return;
+                const { counter } = event.payload;
+                if (counter === lastCounterRef.current) return;
+                lastCounterRef.current = counter;
+
+                // Drop if previous frame is still decoding.
+                if (decodingRef.current) return;
                 decodingRef.current = true;
 
-                const url = `stream://localhost/frame.jpg?t=${meta.counter}`;
+//                 const url = `stream://localhost/frame.jpg?t=${counter}`;
+                const url = isAndroid
+                ? `http://stream.localhost/frame.jpg?t=${counter}`
+                : `stream://localhost/frame.jpg?t=${counter}`;
+                console.log("URL", url)
                 const img = new Image();
                 img.onload = () => {
                     const canvas = canvasRef.current;
@@ -171,31 +136,27 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
                             canvas.width = img.width;
                             canvas.height = img.height;
                         }
-                        const ctx = canvas.getContext('2d');
-                        ctx?.drawImage(img, 0, 0);
+                        canvas.getContext('2d')?.drawImage(img, 0, 0);
                     }
                     decodingRef.current = false;
                 };
-                setPreviewSrc(url)
                 img.onerror = () => {
+                    console.warn('[BDR] frame decode failed', url);
                     decodingRef.current = false;
                 };
                 img.src = url;
-            } catch { /* ignore */ }
+
+            });
+            if (cancelled) unlisten?.();
         };
 
-        pollRef.current = setInterval(poll, Math.max(16, Math.floor(1000 / fps)));
-        return () => {
-            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-        };
-    }, [isBroadcasting, fps, useSynthetic, isAndroid]);
+            setup();
 
-    // Wrap accessors so the poller reads the latest value.
-    // (Kept for clarity; the ref itself is what matters.)
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    // @ts-ignore - defined below via useMemo-like object
-    // We'll just use lastCounterRef directly.
-    // (Adjust below.)
+            return () => {
+                cancelled = true;
+                unlisten?.();
+            };
+    }, [isBroadcasting, useSynthetic, isAndroid]);
 
     // -------------------------------------------------------------------
     // 5. Allow-control prop sync
@@ -251,10 +212,8 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
             // Reset the counter so the first frame triggers an update.
             lastCounterRef.current = -1;
-            setLastCounter(-1);
-            setPreviewSrc('');
             setIsBroadcasting(true);
-            console.log('[BDR] broadcasting=', isBroadcasting);
+            console.log('[BDR] broadcasting=', !isBroadcasting);
 
             WebRTCService.updateMyState({
                 isBroadcasting: true, broadcastResolution: '1080p', broadcastFps: fps,
@@ -273,10 +232,7 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
         try { await invoke('stop_screen_stream'); } catch { /* ignore */ }
         WebRTCService.stopScreenCapture();
         setIsBroadcasting(false);
-        setPreviewSrc('');
-        setMetaDebug(null);
         lastCounterRef.current = -1;
-        setLastCounter(-1);
         WebRTCService.updateMyState({ isBroadcasting: false });
     };
 
@@ -295,21 +251,6 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
     return (
         <div className="flex-1 flex flex-col space-y-6">
-            {/* Debug overlay — visible on the device screen */}
-            {isBroadcasting && (
-                <div
-                    style={{
-                        position: 'fixed', top: 0, left: 0, right: 0,
-                        background: 'rgba(220,38,38,0.92)', color: 'white',
-                        padding: '4px 8px', fontSize: 11, fontFamily: 'monospace',
-                        zIndex: 99999, pointerEvents: 'none',
-                    }}
-                >
-                    plat={platform} meta={metaDebug?.counter ?? '-'} active={String(metaDebug?.active ?? '-')}
-                    {' '}src={previewSrc ? 'set' : 'empty'}
-                </div>
-            )}
-
             <div className="p-6 rounded-3xl bg-white dark:bg-vellichor-card border border-gray-200 dark:border-vellichor-border shadow-sm space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
@@ -417,13 +358,6 @@ export const ScreenBroadcaster: React.FC<ScreenBroadcasterProps> = ({
 
             {/* Preview */}
             <div className="flex-1 min-h-[320px] bg-black rounded-3xl overflow-hidden border border-gray-800 relative flex items-center justify-center shadow-xl">
-                {/*<img
-                    src={previewSrc}
-                    alt=""
-                    className={`w-full h-full object-contain ${isBroadcasting && previewSrc ? '' : 'hidden'}`}
-                    onError={(e) => console.error('[BDR] <img> load error', e)}
-                    onLoad={() => console.log('[BDR] <img> loaded', previewSrc)}
-                />*/}
                 <canvas
                     ref={canvasRef}
                     className={`w-full h-full object-contain ${isBroadcasting ? '' : 'hidden'}`}

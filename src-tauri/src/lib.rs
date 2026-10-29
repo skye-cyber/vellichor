@@ -294,8 +294,8 @@ pub fn run() {
         })
         .manage(files::DownloadRegistry::new())
         .manage(screen_capture::CaptureState::new())
-        .register_uri_scheme_protocol("stream", |ctx, _req| {
-            screen_capture::stream_uri_handler(ctx)
+        .register_uri_scheme_protocol("stream", |ctx, request| {
+            screen_capture::stream_uri_handler(ctx, request)
         })
         // Tauri IPC command handlers registration
         .invoke_handler(tauri::generate_handler![
@@ -344,9 +344,11 @@ pub fn run() {
 
             let _ = device_id::set_device_id_dir(paths::deviceid_dir(&handle));
 
+            let state: tauri::State<'_, CaptureState> = app.state();
+            state.frame_sink.set_app_handle(app.handle().clone());
+
             #[cfg(target_os = "android")]
             {
-                let state: tauri::State<'_, CaptureState> = app.state();
                 let _ = screen_capture::ANDROID_FRAME_SINK.set(state.frame_sink.clone());
             }
 

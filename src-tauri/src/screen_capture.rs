@@ -1,41 +1,67 @@
 use std::io::Cursor;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
-
 use image::RgbaImage;
 use pinray::{CaptureEvent, CaptureSession, SourceId, VideoCaptureTarget};
 use tauri::ipc::{Channel, InvokeResponseBody}; // kept for compat where needed
 use tauri::http::Response;
-use tauri::{AppHandle, Manager, State, UriSchemeContext};
+use tauri::{AppHandle, Manager, Emitter, State, UriSchemeContext};
 #[cfg(target_os = "android")]
 use jni::jni_str;
 #[cfg(target_os = "android")]
 use jni::jni_sig;
 #[cfg(target_os = "android")]
 use jni::objects::ReleaseMode;
-#[cfg(target_os = "android")]
-use std::sync::OnceLock;
 
 // ---------------------------------------------------------------------------
 // Frame sink: one shared slot for the latest JPEG frame.
 // Both the stream:// handler and the fan-out task read from this.
 // ---------------------------------------------------------------------------
 
-#[derive(Default)]
 pub struct FrameSink {
     pub latest: Mutex<Option<Vec<u8>>>,
     pub dimensions: Mutex<(u32, u32)>,
     pub counter: AtomicU64,
+    app_handle: OnceLock<AppHandle>,
 }
+
+impl Default for FrameSink {
+    fn default() -> Self {
+        Self {
+            latest: Mutex::new(None),
+            dimensions: Mutex::new((0, 0)),
+            counter: AtomicU64::new(0),
+            app_handle: OnceLock::new(),
+        }
+    }
+}
+
 #[cfg(target_os = "android")]
 pub static ANDROID_FRAME_SINK: OnceLock<Arc<FrameSink>> = OnceLock::new();
 
 impl FrameSink {
+    /// Called once during Tauri setup so publish() can notify the frontend.
+    pub fn set_app_handle(&self, handle: AppHandle) {
+        let _ = self.app_handle.set(handle);
+    }
+
     pub fn publish(&self, jpeg: Vec<u8>, width: u32, height: u32) {
+        let len = jpeg.len();
+        let counter = self.counter.fetch_add(1, Ordering::SeqCst) + 1;
+
         *self.latest.lock().unwrap() = Some(jpeg);
         *self.dimensions.lock().unwrap() = (width, height);
-        self.counter.fetch_add(1, Ordering::SeqCst);
+
+        // Notify the frontend. Fire-and-forget; if no listener, it's a no-op.
+        if let Some(handle) = self.app_handle.get() {
+            let _ = handle.emit("frame-published", FrameEvent {
+                counter,
+                width,
+                height,
+                byte_length: len as u32,
+            });
+        }
     }
 
     pub fn read(&self) -> Option<(Vec<u8>, u32, u32)> {
@@ -48,6 +74,15 @@ impl FrameSink {
         *self.latest.lock().unwrap() = None;
         self.counter.fetch_add(1, Ordering::SeqCst);
     }
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameEvent {
+    pub counter: u64,
+    pub width: u32,
+    pub height: u32,
+    pub byte_length: u32,
 }
 
 pub struct CaptureState {
@@ -224,8 +259,10 @@ pub fn stop_screen_stream(state: State<'_, CaptureState>) -> Result<(), String> 
 // ---------------------------------------------------------------------------
 
 pub fn stream_uri_handler<R: tauri::Runtime>(
-    ctx: UriSchemeContext<'_, R>,
-) -> Response<Vec<u8>> {
+    ctx: tauri::UriSchemeContext<'_, R>,
+    request: tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    eprintln!("[STREAM_URI] requested: {}", request.uri());
     let app = ctx.app_handle();
     let state: State<CaptureState> = app.state();
 
