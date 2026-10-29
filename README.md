@@ -48,7 +48,7 @@ flowchart TD
     
     VDT --> Sockets["Low-Latency Binary WebSockets & LAN TCP (Port 42426)"]
     Sockets --> ControlChan["Control Channel (Sub-5ms Touchpad & Keys)"]
-    Sockets --> FileChan["File Channel (64KB Native Stream directly to Disk)"]
+    Sockets --> FileChan["File Channel (256KB Native Stream directly to Disk)"]
     Sockets --> CanvasVideo["Hardware-Accelerated HTML5 Canvas Video Frame Pipeline"]
 ```
 
@@ -312,7 +312,7 @@ graph TB
             C2[WebRTC Manager<br/>DataChannels & MediaStream]
             C3[Streaming Service<br/>Viewer & Broadcaster]
             C4[Input Handler<br/>Touchpad, Keyboard & Media]
-            C5[File Transfer Service<br/>64KB Chunker & Web Share]
+            C5[File Transfer Service<br/>256KB Chunker & Web Share]
         end
         
         B --- C1
@@ -470,7 +470,7 @@ flowchart TB
     
     subgraph File["File Transfer Pipeline"]
         direction LR
-        F1[File Selector] --> F2[Chunker<br/>64KB blocks]
+        F1[File Selector] --> F2[Chunker<br/>256KB blocks]
         F2 --> F3[CRC Calculator]
         F3 --> F4[Resume Manager]
         F4 --> F5[Data Channel]

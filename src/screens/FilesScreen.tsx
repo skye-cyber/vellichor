@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   FolderSync,
-  Upload,
+//   Upload,
   ArrowUpDown,
-  Share2,
+//   Share2,
   AlertCircle,
   FileText,
 } from 'lucide-react';
@@ -27,6 +27,7 @@ export const FilesScreen: React.FC<FilesScreenProps> = ({
   const [activeTab, setActiveTab] = useState<'files' | 'transfers'>('files');
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [webShareFile, setWebShareFile] = useState<TransferFile | null>(null);
+  const [localFiles, setLocalFiles] = useState<TransferFile[]>([]);
 
   useEffect(() => {
     const unsub = FileTransferService.subscribe((list) => {
@@ -58,7 +59,7 @@ export const FilesScreen: React.FC<FilesScreenProps> = ({
             )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            P2P 64KB block transfers over WebRTC with CRC verification & instant QR web downloads.
+            P2P 256KB block transfers over WebRTC with CRC verification & instant QR web downloads.
           </p>
         </div>
 
@@ -117,6 +118,8 @@ export const FilesScreen: React.FC<FilesScreenProps> = ({
           <FileBrowser
             connectedDevice={connectedDevice}
             onWebShare={(file) => setWebShareFile(file)}
+            localFiles={localFiles}
+            setLocalFiles={setLocalFiles}
           />
         ) : (
           <TransferQueue transfers={transfers} />

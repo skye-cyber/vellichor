@@ -104,7 +104,8 @@ export const App: React.FC = () => {
                             connectedDevice={connectedDevice}
                             systemInfo={systemInfo}
                             onNavigate={(tab) => setCurrentTab(tab)}
-                            onConnectDevice={connectToDevice}
+                            onConnect={connectToDevice}
+                            onDisconnect={disconnectDevice}
                         />
                     )}
 

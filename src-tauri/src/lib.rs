@@ -9,6 +9,7 @@ pub mod system;
 pub mod types;
 pub mod paths;
 pub mod device_id;
+pub mod screen_capture;
 
 // Re-exports for clean library access
 pub use cache::*;
@@ -22,12 +23,12 @@ pub use types::*;
 // pub mod device_id::*;
 
 // App imports
-use std::collections::HashMap;
 use std::sync::Mutex;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 // Cross-platform imports — used on desktop, Android, and iOS
 use tauri::{AppHandle, Manager, Runtime, WindowEvent};
+use crate::screen_capture::CaptureState;
 
 // Desktop-only imports — tray, menu, and global shortcuts
 #[cfg(desktop)]
@@ -52,13 +53,11 @@ struct IconState {
     path: std::sync::Mutex<PathBuf>,
 }
 
-/// Replaces `ipcMain.handle('get-app-version', ...)`
 #[tauri::command]
 fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-/// Replaces `ipcMain.handle('get-dev-status', ...)`
 #[tauri::command]
 fn get_dev_status() -> bool {
     cfg!(debug_assertions)
@@ -294,6 +293,10 @@ pub fn run() {
             path: std::sync::Mutex::new(PathBuf::new()),
         })
         .manage(files::DownloadRegistry::new())
+        .manage(screen_capture::CaptureState::new())
+        .register_uri_scheme_protocol("stream", |ctx, _req| {
+            screen_capture::stream_uri_handler(ctx)
+        })
         // Tauri IPC command handlers registration
         .invoke_handler(tauri::generate_handler![
             get_dev_status,
@@ -320,7 +323,13 @@ pub fn run() {
             files::cleanup_download,
             // Decentralized P2P node server signaling commands
             node_server::send_peer_signal,
-            node_server::get_node_status
+            node_server::get_node_status,
+            screen_capture::list_monitors,
+            screen_capture::start_screen_stream,
+            screen_capture::stop_screen_stream,
+            screen_capture::get_frame_meta,
+            #[cfg(target_os = "android")]
+            screen_capture::start_android_screen_stream,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -334,6 +343,12 @@ pub fn run() {
             }
 
             let _ = device_id::set_device_id_dir(paths::deviceid_dir(&handle));
+
+            #[cfg(target_os = "android")]
+            {
+                let state: tauri::State<'_, CaptureState> = app.state();
+                let _ = screen_capture::ANDROID_FRAME_SINK.set(state.frame_sink.clone());
+            }
 
             /* Desktop-only setup. Everything below touches APIs that are
              * `#[cfg(desktop)]`-gated inside Tauri itself (tray, window icons, global shortcuts, menu).

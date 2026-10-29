@@ -17,9 +17,10 @@ import { Device, SystemInfo } from '../types';
 interface HomeScreenProps {
     devices: Device[];
     connectedDevice: Device | null;
+    onDisconnect: (device: Device) => void;
+    onConnect: (device: Device) => void;
     systemInfo: SystemInfo | null;
     onNavigate: (tab: string) => void;
-    onConnectDevice: (device: Device) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -27,7 +28,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     connectedDevice,
     systemInfo,
     onNavigate,
-    onConnectDevice,
+    onConnect,
+    onDisconnect,
 }) => {
     const features = [
         {
@@ -255,10 +257,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             </div>
 
                             <button
-                                onClick={() => onConnectDevice(device)}
-                                className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shrink-0 ml-2 shadow-sm transition-all cursor-pointer"
+                                onClick={() => isConnected ? onDisconnect(device) : onConnect(device)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer ${isConnected
+                                    ? 'bg-red-400 text-white shadow-sm'
+                                    : 'bg-primary text-white hover:bg-primary-hover shadow-balanced-sm'
+                                    }`}
                             >
-                                {connectedDevice?.id === device.id ? 'Connected' : 'Connect'}
+                                <span>{isConnected ? 'Disconnect' : 'Connect'}</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     ))}

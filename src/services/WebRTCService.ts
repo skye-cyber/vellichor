@@ -587,37 +587,44 @@ class WebRTCServiceClass {
 
         let stream: MediaStream | null = null;
 
-        if (!options?.useSyntheticFallback && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-            try {
-                // Standard Linux desktop portals (xdg-desktop-portal) do not support audio screencast.
-                // We capture video explicitly without audio to ensure the portal selection prompt displays reliably.
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: {
-                        width: { ideal: width },
-                        height: { ideal: height },
-                        frameRate: { ideal: options?.fps || 60 },
-                    },
-                    audio: false,
-                });
-            } catch (err: any) {
-                if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
-                    // User clicked "Cancel" on the portal/window picker dialog
-                    throw err;
-                }
-                console.warn('getDisplayMedia attempt failed, trying fallback constraints:', err);
-                try {
-                    stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-                } catch (innerErr: any) {
-                    if (innerErr.name === 'NotAllowedError' || innerErr.name === 'AbortError') {
-                        throw innerErr;
-                    }
-                    console.warn('Native getDisplayMedia unavailable, using interactive virtual display:', innerErr);
-                }
-            }
+        // ONE call, no retry. Use the simplest possible constraints.
+        if (!options?.useSyntheticFallback && navigator.mediaDevices?.getDisplayMedia) {
+            // No awaits before this line. Caller must invoke this directly
+            // from the click handler (or within 1s of it).
+            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            // was
+            // stream = await navigator.mediaDevices.getDisplayMedia({
+            //     video: {
+            //         width: { ideal: width },
+            //         height: { ideal: height },
+            //         frameRate: { ideal: options?.fps || 60 },
+            //     },
+            //     audio: false,
+            // });
         }
 
         if (!stream) {
             stream = this.createSyntheticDisplayStream(width, height, options?.fps || 30);
+        }
+
+        if (stream && (options?.resolution || options?.fps)) {
+            const track = stream.getVideoTracks()[0];
+            if (track) {
+                const constraints: MediaTrackConstraints = {};
+                if (options?.resolution === '720p') {
+                    constraints.width = { ideal: 1280 };
+                    constraints.height = { ideal: 720 };
+                } else if (options?.resolution === '1080p') {
+                    constraints.width = { ideal: 1920 };
+                    constraints.height = { ideal: 1080 };
+                }
+                if (options?.fps) constraints.frameRate = { ideal: options.fps };
+                try {
+                    await track.applyConstraints(constraints);
+                } catch (e) {
+                    console.warn('[SCREEN] applyConstraints failed (non-fatal):', e);
+                }
+            }
         }
 
         this.localStream = stream;

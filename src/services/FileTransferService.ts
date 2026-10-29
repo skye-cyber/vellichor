@@ -582,7 +582,7 @@ export class FileTransferServiceClass {
 
             // Only ack after the write returned; duplicate acks are safe
             // because the sender treats them idempotently.
-            const ok = WebRTCService.sendData('file-ctl', {
+            WebRTCService.sendData('file-ctl', {
                 type: 'file_chunk_ack', transferId, index,
             });
 

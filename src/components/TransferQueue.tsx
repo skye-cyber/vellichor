@@ -38,7 +38,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                     No Active Transfers
                 </h4>
                 <p className="text-xs text-gray-500 max-w-xs">
-                    Files sent to or received from connected peers stream in 64KB blocks with real-time throughput metrics.
+                    Files sent to or received from connected peers stream in 256KB blocks with real-time throughput metrics.
                 </p>
             </div>
         );
@@ -155,7 +155,7 @@ export const TransferQueue: React.FC<TransferQueueProps> = ({ transfers }) => {
                             </div>
                             <div className="flex justify-between text-[10px] text-gray-400 font-mono">
                                 <span>
-                                    {item.currentChunk || 0} / {item.totalChunks || 1} chunks (64KB blocks)
+                                    {item.currentChunk || 0} / {item.totalChunks || 1} chunks (256KB blocks)
                                 </span>
                                 <span>{item.progress}%</span>
                             </div>
